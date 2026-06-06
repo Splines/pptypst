@@ -25,6 +25,7 @@ import typstCompilerWasm from "@myriaddreamin/typst-ts-web-compiler/pkg/typst_ts
 // @ts-expect-error WASM module import
 import typstRendererWasm from "@myriaddreamin/typst-ts-renderer/pkg/typst_ts_renderer_bg.wasm?url";
 import { registryRequest } from "./registry/registry";
+import { TypstSource } from "./payload.js";
 
 let compiler: typstWeb.TypstCompiler;
 let renderer: typstWeb.TypstRenderer;
@@ -80,21 +81,21 @@ async function initRenderer() {
 /**
  * Builds the complete Typst code with page setup and font size.
  *
- * Note: If you change the number of lines added here, make sure to update
- * the diagnostic range offset in preview.ts accordingly.
- *
- * @param rawCode The user's Typst code
+ * @param source The user's Typst source
  * @param fontSize Font size in points
  * @param mathMode Whether to wrap the code in display math delimiters
  * @returns Complete Typst code ready for compilation
  */
-function buildRawTypstString(rawCode: string, fontSize: string, mathMode: boolean): string {
-  let code = rawCode;
+function buildRawTypstString(source: TypstSource, fontSize: string, mathMode: boolean): string {
+  let body = source.body;
   if (mathMode) {
-    code = `$\n${rawCode}\n$`;
+    body = `$\n${source.body}\n$`;
   }
+
+  const separator = source.preamble && body && !source.preamble.endsWith("\n") ? "\n" : "";
+  const compiledUserSource = `${source.preamble}${separator}${body}`;
   return "#set page(margin: 3pt, background: none, width: auto, fill: none, height: auto)"
-    + `\n#set text(size: ${fontSize}pt)\n${code}`;
+    + `\n#set text(size: ${fontSize}pt)\n${compiledUserSource}`;
 }
 
 export interface CompilationResult {
@@ -122,10 +123,12 @@ export type Diagnostics = (string | DiagnosticMessage)[] | undefined;
 /**
  * Compiles the given Typst source to SVG.
  */
-export async function typst(source: string, fontSize: string, mathMode: boolean): Promise<CompilationResult> {
+export async function typst(
+  source: TypstSource, fontSize: string, mathMode: boolean,
+): Promise<CompilationResult> {
   const mainFilePath = "/main.typ";
-  const typstCode = buildRawTypstString(source, fontSize, mathMode);
-  compiler.addSource(mainFilePath, typstCode);
+  const builtSource = buildRawTypstString(source, fontSize, mathMode);
+  compiler.addSource(mainFilePath, builtSource);
   const response = await compiler.compile({ mainFilePath });
   const diagnostics: Diagnostics = response.diagnostics;
 

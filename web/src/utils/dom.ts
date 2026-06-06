@@ -44,6 +44,13 @@ export function getButtonElement(id: string): HTMLButtonElement {
 }
 
 /**
+ * Gets an HTMLDetailsElement by ID.
+ */
+export function getDetailsElement(id: string): HTMLDetailsElement {
+  return getElement(id, HTMLDetailsElement);
+}
+
+/**
  * Gets a generic HTMLElement by ID.
  */
 export function getHTMLElement(id: string): HTMLElement {

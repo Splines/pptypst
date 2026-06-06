@@ -19,7 +19,7 @@ async function cachedFetch(input: RequestInfo | URL, init?: RequestInit): Promis
     return fetch(request);
   }
 
-  let cache: Cache | null = null;
+  let cache: Cache | null;
   try {
     cache = await caches.open(FONT_CACHE_NAME);
     const cached = await cache.match(request);

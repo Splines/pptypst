@@ -8,6 +8,7 @@ import { defineConfig } from "eslint/config";
 
 const customGlobals = {
   PowerPoint: "readonly",
+  Office: "readonly",
 };
 
 export default defineConfig([

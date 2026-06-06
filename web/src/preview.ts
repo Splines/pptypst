@@ -5,19 +5,21 @@ import { getAreaElement, getHTMLElement, getInputElement } from "./utils/dom";
 import {
   getFillColor,
   getFontSize,
+  getPreambleCode,
+  getEditorMode,
   getMathModeEnabled,
   getTypstCode,
   setButtonEnabled,
   setMathModeEnabled,
 } from "./ui";
 import { storeValue, getStoredValue } from "./utils/storage.js";
-import { lastTypstShapeId } from "./shape.js";
 
 /**
  * Sets up event listeners for preview updates.
  */
 export function setupPreviewListeners() {
   const typstInput = getAreaElement(DOM_IDS.TYPST_INPUT);
+  const preambleInput = getAreaElement(DOM_IDS.PREAMBLE_INPUT);
   const fontSizeInput = getInputElement(DOM_IDS.FONT_SIZE);
   const fillColorInput = getInputElement(DOM_IDS.FILL_COLOR);
   const fillColorEnabled = getInputElement(DOM_IDS.FILL_COLOR_ENABLED);
@@ -26,6 +28,13 @@ export function setupPreviewListeners() {
 
   typstInput.addEventListener("input", () => {
     updateButtonState();
+    void updatePreview();
+  });
+
+  preambleInput.addEventListener("input", () => {
+    if (getEditorMode() === "insert") {
+      storeValue(STORAGE_KEYS.PREAMBLE, getPreambleCode());
+    }
     void updatePreview();
   });
 
@@ -56,7 +65,7 @@ export function setupPreviewListeners() {
 
   mathModeEnabled.addEventListener("change", () => {
     const mathMode = getMathModeEnabled();
-    if (!lastTypstShapeId) {
+    if (getEditorMode() === "insert") {
       // Only save to storage when in insert mode (no shape selected)
       storeValue(STORAGE_KEYS.MATH_MODE, mathMode.toString());
     }
@@ -126,6 +135,7 @@ export function updateMathModeVisuals() {
  */
 export async function updatePreview() {
   const rawCode = getTypstCode().trim();
+  const preamble = getPreambleCode();
   const fontSize = getFontSize();
   const mathMode = getMathModeEnabled();
   const previewElement = getHTMLElement(DOM_IDS.PREVIEW_CONTENT);
@@ -138,11 +148,11 @@ export async function updatePreview() {
     return;
   }
 
-  const result = await typst(rawCode, fontSize, mathMode);
+  const result = await typst({ body: rawCode, preamble }, fontSize, mathMode);
 
   if (result.diagnostics && result.diagnostics.length > 0) {
     diagnosticsContainer.style.display = "block";
-    displayDiagnostics(result.diagnostics, diagnosticsContent, mathMode);
+    displayDiagnostics(result.diagnostics, diagnosticsContent);
   } else {
     diagnosticsContainer.style.display = "none";
   }
@@ -174,7 +184,10 @@ export async function updatePreview() {
 /**
  * Displays diagnostics in the UI.
  */
-function displayDiagnostics(diagnostics: (string | DiagnosticMessage)[], content: HTMLElement, mathMode: boolean) {
+function displayDiagnostics(
+  diagnostics: (string | DiagnosticMessage)[],
+  content: HTMLElement,
+) {
   content.innerHTML = "";
 
   diagnostics.forEach((diag, index) => {
@@ -202,13 +215,7 @@ function displayDiagnostics(diagnostics: (string | DiagnosticMessage)[], content
     severitySpan.className = "diagnostic-severity";
     severitySpan.textContent = diag.severity;
 
-    const rangeSpan = document.createElement("span");
-    rangeSpan.className = "diagnostic-range";
-    const rangeString = correctDiagnosticRange(diag.range, mathMode);
-    rangeSpan.textContent = rangeString;
-
     headerDiv.appendChild(severitySpan);
-    headerDiv.appendChild(rangeSpan);
 
     const messageSpan = document.createElement("span");
     messageSpan.className = "diagnostic-message";
@@ -225,30 +232,11 @@ function displayDiagnostics(diagnostics: (string | DiagnosticMessage)[], content
  * Updates the insert button enabled state based on whether there's input.
  */
 export function updateButtonState() {
+  if (getEditorMode() === "multi-select") {
+    setButtonEnabled(false);
+    return;
+  }
+
   const rawCode = getTypstCode().trim();
   setButtonEnabled(rawCode.length > 0);
-}
-
-/**
- * Corrects the diagnostic range to account for added lines in the Typst code.
- *
- * See `buildRawTypstString` for details.
- *
- * @param range The range string from the diagnostic
- * @param mathMode Whether math mode is enabled (adds extra line offset)
- */
-function correctDiagnosticRange(range: string, mathMode: boolean): string {
-  const rangeRegex = /(\d+):(\d+)-(\d+):(\d+)/;
-  const match = range.match(rangeRegex);
-  if (match) {
-    // buildRawTypstString adds 2 lines before user code
-    // If mathMode is enabled, it adds one more line for the opening $
-    const offset = mathMode ? 3 : 2;
-    const startLine = parseInt(match[1], 10) - offset;
-    const startCol = parseInt(match[2], 10);
-    const endLine = parseInt(match[3], 10) - offset;
-    const endCol = parseInt(match[4], 10);
-    return `${startLine.toString()}:${startCol.toString()}-${endLine.toString()}:${endCol.toString()}`;
-  }
-  return range;
 }

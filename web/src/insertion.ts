@@ -1,16 +1,30 @@
 import { debug } from "./utils/logger.js";
 import { applyFillColor, normalizeAlphaHexColors, parseAndApplySize } from "./svg.js";
 import { typst } from "./typst.js";
-import { setStatus, getFontSize, getFillColor, getMathModeEnabled, getTypstCode } from "./ui.js";
-import { isTypstPayload, createTypstPayload, extractTypstCode } from "./payload.js";
+import {
+  setStatus,
+  getFontSize,
+  getFillColor,
+  getMathModeEnabled,
+  getTypstCode,
+  getPreambleCode,
+  getEditorMode,
+} from "./ui.js";
+import { TypstSource } from "./payload.js";
 import { storeValue } from "./utils/storage.js";
-import { lastTypstShapeId, TypstShapeInfo, writeShapeProperties, readShapeTag } from "./shape.js";
+import {
+  lastTypstShapeId,
+  TypstShapeInfo,
+  writeShapeProperties,
+  readShapeTag,
+  readTypstSource,
+  isLoadedTypstShape,
+} from "./shape.js";
 import { STORAGE_KEYS, SHAPE_CONFIG, FILL_COLOR_DISABLED } from "./constants.js";
 
 type PreparedSvgResult = {
   svg: string;
   size: { width: number; height: number };
-  payload: string;
 };
 
 type SlideSize = {
@@ -22,12 +36,12 @@ type SlideSize = {
  * Compiles Typst code to SVG and prepares it for insertion.
  */
 async function prepareTypstSvg(
-  typstCode: string,
+  source: TypstSource,
   fontSize: string,
   fillColor: string | null,
   mathMode: boolean,
 ): Promise<PreparedSvgResult | null> {
-  const result = await typst(typstCode, fontSize, mathMode);
+  const result = await typst(source, fontSize, mathMode);
   if (!result.svg) {
     // diagnostics are only shown for preview, not insertion
     return null;
@@ -41,9 +55,8 @@ async function prepareTypstSvg(
 
   const serializer = new XMLSerializer();
   const svg = serializer.serializeToString(svgElement);
-  const payload = createTypstPayload(typstCode);
 
-  return { svg, size, payload };
+  return { svg, size };
 }
 
 /**
@@ -85,14 +98,28 @@ async function insertSvgAndTag(
  * Inserts or updates a Typst formula in PowerPoint.
  */
 export async function insertOrUpdateFormula() {
-  const rawCode = getTypstCode();
+  if (getEditorMode() === "multi-select") {
+    setStatus(
+      "Select a single Typst shape to update it, or clear the selection to insert a new one.", true);
+    return;
+  }
+
+  const source: TypstSource = {
+    body: getTypstCode(),
+    preamble: getPreambleCode(),
+  };
   const fontSize = getFontSize();
   const fillColor = getFillColor();
   const mathMode = getMathModeEnabled();
   storeValue(STORAGE_KEYS.FONT_SIZE, fontSize);
   storeValue(STORAGE_KEYS.FILL_COLOR, fillColor);
+  if (getEditorMode() === "insert") {
+    // overwrite global preamble only when inserting a new shape, not when
+    // editing an existing shape
+    storeValue(STORAGE_KEYS.PREAMBLE, source.preamble);
+  }
 
-  const prepared = await prepareTypstSvg(rawCode, fontSize, fillColor, mathMode);
+  const prepared = await prepareTypstSvg(source, fontSize, fillColor, mathMode);
   if (!prepared) {
     setStatus("Typst compile failed.", true);
     return;
@@ -100,12 +127,10 @@ export async function insertOrUpdateFormula() {
 
   try {
     await PowerPoint.run(async (context) => {
-      const selection = context.presentation.getSelectedShapes();
       const selectedSlides = context.presentation.getSelectedSlides();
       const allSlides = context.presentation.slides;
       const pageSetup = context.presentation.pageSetup;
 
-      selection.load("items");
       selectedSlides.load("items");
       allSlides.load("items");
       pageSetup.load(["slideWidth", "slideHeight"]);
@@ -131,7 +156,7 @@ export async function insertOrUpdateFormula() {
       let rotation: number | undefined;
       let isReplacing = false;
 
-      const typstShape = await findTypstShape(selection.items, allSlides.items, context);
+      const typstShape = await findTypstShape(allSlides.items, context);
       if (typstShape) {
         position = calculateCenteredPosition(typstShape, fittedSize);
         position = clampPositionWithinSlide(position, fittedSize, slideSize);
@@ -145,7 +170,7 @@ export async function insertOrUpdateFormula() {
 
       const existingShapeIds = new Set(targetSlide.shapes.items.map(shape => shape.id));
       const insertedShape = await insertSvgAndTag(prepared.svg, {
-        payload: prepared.payload,
+        source,
         fontSize,
         fillColor: fillColor || null,
         mathMode,
@@ -170,13 +195,8 @@ export async function insertOrUpdateFormula() {
 /**
  * Finds a Typst shape in the current selection or uses cached selection.
  */
-async function findTypstShape(selectedShapes: PowerPoint.Shape[], allSlides: PowerPoint.Slide[],
+async function findTypstShape(allSlides: PowerPoint.Slide[],
   context: PowerPoint.RequestContext): Promise<PowerPoint.Shape | undefined> {
-  const typstShape = selectedShapes.find(
-    shape => isTypstPayload(shape.altTextDescription),
-  );
-  if (typstShape) return typstShape;
-
   if (!lastTypstShapeId) return undefined;
   const id = lastTypstShapeId;
 
@@ -188,7 +208,15 @@ async function findTypstShape(selectedShapes: PowerPoint.Shape[], allSlides: Pow
     await context.sync();
     if (targetSlide.shapes.items.length === 0) return undefined;
 
-    return targetSlide.shapes.items.find(shape => shape.id === id.shapeId);
+    const cachedShape = targetSlide.shapes.items.find(shape => shape.id === id.shapeId);
+    if (!cachedShape) {
+      return undefined;
+    }
+
+    cachedShape.load(["id", "altTextDescription", "left", "top", "width", "height", "rotation"]);
+    cachedShape.tags.load("items/key,items/value");
+    await context.sync();
+    return cachedShape;
   } catch (error) {
     debug("Fallback to last selection failed:", error);
     return undefined;
@@ -242,9 +270,15 @@ export async function bulkUpdateFontSize() {
       selection.load("items");
       await context.sync();
 
-      const typstShapes = selection.items.filter(shape =>
-        isTypstPayload(shape.altTextDescription),
-      );
+      if (selection.items.length > 0) {
+        selection.items.forEach((shape) => {
+          shape.load(["id", "altTextDescription", "left", "top", "width", "height", "rotation"]);
+          shape.tags.load("items/key,items/value");
+        });
+        await context.sync();
+      }
+
+      const typstShapes = selection.items.filter(isLoadedTypstShape);
 
       if (typstShapes.length === 0) {
         setStatus("No Typst shapes selected.", true);
@@ -263,7 +297,12 @@ export async function bulkUpdateFontSize() {
 
       for (const shape of typstShapes) {
         try {
-          const typstCode = extractTypstCode(shape.altTextDescription);
+          const source = await readTypstSource(shape, context);
+          if (!source) {
+            debug(`No Typst source stored for shape ${shape.id}`);
+            continue;
+          }
+
           const storedFillColor = await readShapeTag(shape, SHAPE_CONFIG.TAGS.FILL_COLOR, context);
 
           const fillColor = !storedFillColor || storedFillColor === FILL_COLOR_DISABLED
@@ -271,7 +310,7 @@ export async function bulkUpdateFontSize() {
             : storedFillColor;
 
           const mathMode = getMathModeEnabled();
-          const prepared = await prepareTypstSvg(typstCode, newFontSize, fillColor, mathMode);
+          const prepared = await prepareTypstSvg(source, newFontSize, fillColor, mathMode);
           if (!prepared) {
             debug(`Typst compile failed for shape ${shape.id}`);
             continue;
@@ -298,7 +337,7 @@ export async function bulkUpdateFontSize() {
           await context.sync();
 
           const insertedShape = await insertSvgAndTag(prepared.svg, {
-            payload: prepared.payload,
+            source,
             fontSize: newFontSize,
             fillColor,
             mathMode,
