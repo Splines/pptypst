@@ -72,3 +72,7 @@ If you have used another manifest beforehand, clear the office cache as describe
 ```
 
 The production manifest has URLs configured to point to the site hosted on GitHub Pages. This way, you can see if everything works fine. All we ship to the PowerPoint Marketplace is the Manifest file in the end.
+
+## Useful links
+
+- [PowerPoint JS API](https://learn.microsoft.com/en-us/javascript/api/powerpoint) (Preview) & [v10](https://learn.microsoft.com/en-us/javascript/api/powerpoint?view=powerpoint-js-1.10)
