@@ -6,6 +6,10 @@
             "ESNext",
             "DOM"
         ],
+        "types": [
+            "node",
+            "office-js"
+        ],
         "moduleResolution": "bundler",
         "isolatedModules": true,
         "useDefineForClassFields": true,
