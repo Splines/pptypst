@@ -54,10 +54,9 @@ npm run validate-manifest
 npx playwright install-deps chromium
 npx playwright install chromium
 
-# Start the webserver
-npm run dev
-
 # Run tests (or even easier, just use the Playwright VSCode extension)
+# Note that a dedicated test webserver will automatically be started for the tests,
+# see the playwright.config.ts for details.
 npm run test
 ```
 
