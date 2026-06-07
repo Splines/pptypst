@@ -18,7 +18,9 @@ export function createTypstCompiler() {
   return {
     init(options: CompilerInitOptions) {
       if (typeof options.getModule !== "function") {
-        throw new Error("Expected Typst compiler getModule option.");
+        return Promise.reject(
+          new Error("Expected Typst compiler getModule option."),
+        );
       }
       return Promise.resolve();
     },
