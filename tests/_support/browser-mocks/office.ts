@@ -1,7 +1,20 @@
+/*
+ * Browser replacement for Office.js used by the PowerPoint Playwright tests.
+ *
+ * Keep this file import-free. It is served as the classic `office.js` script,
+ * so the browser will not evaluate ES module imports here.
+ *
+ * The mock has three layers:
+ * 1. Seed and snapshot DTOs used by tests.
+ * 2. A small in-memory PowerPoint document model.
+ * 3. Office.js-shaped facades exposed on globalThis.
+ */
+
 type OfficeReadyInfo = { host: "PowerPoint" };
 type OfficeReadyCallback = (_info: OfficeReadyInfo) => void | Promise<void>;
 type SelectionChangedHandler = () => void | Promise<void>;
 
+// Test-facing seed and snapshot data.
 type MockTypstSource = {
   preamble: string;
   body: string;
@@ -66,12 +79,54 @@ type MockOfficeSnapshot = {
   slides: MockSlideSnapshot[];
 };
 
+// Global APIs installed for the browser app.
+type OfficeAsyncResult = { status: string; error?: Error };
+
+type MockOfficeDocument = {
+  addHandlerAsync: (_eventType: string, _handler: SelectionChangedHandler) => void;
+  setSelectedDataAsync: (
+    _data: string,
+    _options: { coercionType: string },
+    _callback: (_result: OfficeAsyncResult) => void,
+  ) => void;
+};
+
+type MockOfficeHost = {
+  HostType: { PowerPoint: "PowerPoint" };
+  EventType: { DocumentSelectionChanged: "DocumentSelectionChanged" };
+  AsyncResultStatus: { Succeeded: "succeeded"; Failed: "failed" };
+  CoercionType: { XmlSvg: "xmlSvg" };
+  actions: { associate: (_name: string, _handler: unknown) => void };
+  context: { document: MockOfficeDocument };
+  onReady: (_callback: OfficeReadyCallback) => Promise<void>;
+};
+
+type MockPowerPointHost = {
+  run: <T>(_callback: (_context: MockRequestContext) => Promise<T> | T) => Promise<T>;
+};
+
+type MockOfficeTestHarness = {
+  reset: (_seed?: MockOfficeSeed) => void;
+  selectShapes: (_slideId: string, _shapeIds: string[]) => Promise<void>;
+  clearSelection: (_slideId?: string) => Promise<void>;
+  snapshot: () => MockOfficeSnapshot;
+};
+
+type MockGlobals = {
+  Office: MockOfficeHost;
+  PowerPoint: MockPowerPointHost;
+  __pptypstOfficeMock: MockOfficeTestHarness;
+  __pptypstOfficeSeed?: MockOfficeSeed;
+};
+
 type Loadable = { load: (_properties?: unknown) => void };
+type Identifiable = { id: string };
 
 const SHAPE_XML_NAMESPACE = "https://splines.github.io/pptypst/shape/v1";
 const DEFAULT_SLIDE_WIDTH = 960;
 const DEFAULT_SLIDE_HEIGHT = 540;
 
+// Small Office.js collection/value objects used by app code.
 class MockCollection<T> implements Loadable {
   private readonly getItems: () => T[];
 
@@ -86,11 +141,31 @@ class MockCollection<T> implements Loadable {
   load() {}
 }
 
+class MockItemCollection<T extends Identifiable> extends MockCollection<T> {
+  private readonly missingItem?: (_id: string) => T;
+
+  constructor(
+    getItems: () => T[],
+    missingItem?: (_id: string) => T,
+  ) {
+    super(getItems);
+    this.missingItem = missingItem;
+  }
+
+  getItem(id: string): T {
+    const item = this.items.find(candidate => candidate.id === id);
+    if (item) return item;
+    if (this.missingItem) return this.missingItem(id);
+
+    throw new Error(`Item ${id} not found.`);
+  }
+}
+
 class MockFill implements Loadable {
   foregroundColor: string | null;
 
-  constructor(color: string | null) {
-    this.foregroundColor = color;
+  constructor(foregroundColor: string | null) {
+    this.foregroundColor = foregroundColor;
   }
 
   load() {}
@@ -101,7 +176,11 @@ class MockTagItem implements Loadable {
   readonly isNullObject: boolean;
   private readonly getValue: () => string;
 
-  constructor(key: string, getValue: () => string, isNullObject = false) {
+  constructor(
+    key: string,
+    getValue: () => string,
+    isNullObject = false,
+  ) {
     this.key = key;
     this.getValue = getValue;
     this.isNullObject = isNullObject;
@@ -116,23 +195,26 @@ class MockTagItem implements Loadable {
 
 class MockTagCollection implements Loadable {
   private readonly tagMap: Map<string, string>;
-  private readonly onTagAdd: (_key: string, _value: string) => void;
+  private readonly onAdd: (_key: string, _value: string) => void;
 
   constructor(
     tagMap: Map<string, string>,
-    onTagAdd: (_key: string, _value: string) => void,
+    onAdd: (_key: string, _value: string) => void,
   ) {
     this.tagMap = tagMap;
-    this.onTagAdd = onTagAdd;
+    this.onAdd = onAdd;
   }
 
   get items(): MockTagItem[] {
-    return Array.from(this.tagMap.entries(), ([key, value]) => new MockTagItem(key, () => value));
+    return Array.from(
+      this.tagMap.entries(),
+      ([key, value]) => new MockTagItem(key, () => value),
+    );
   }
 
   add(key: string, value: string) {
     this.tagMap.set(key, value);
-    this.onTagAdd(key, value);
+    this.onAdd(key, value);
   }
 
   getItemOrNullObject(key: string): MockTagItem {
@@ -195,9 +277,8 @@ class MockCustomXmlPartCollection implements Loadable {
   load() {}
 }
 
-class MockShape implements Loadable {
-  readonly mock: MockPowerPointRuntime;
-  readonly parentSlide: MockSlide;
+// In-memory PowerPoint document model.
+class MockShape implements Loadable, Identifiable {
   readonly id: string;
   altTextTitle = "";
   altTextDescription = "";
@@ -207,23 +288,25 @@ class MockShape implements Loadable {
   width = 160;
   height = 40;
   rotation = 0;
-  readonly fill: MockFill;
+  svgContent: string | null = null;
+
+  readonly fill = new MockFill(null);
   readonly tags: MockTagCollection;
   readonly customXmlParts: MockCustomXmlPartCollection;
-  svgContent: string | null = null;
 
   private readonly tagMap = new Map<string, string>();
   private readonly xmlParts: MockXmlPart[] = [];
+  private readonly documentModel: MockPowerPointDocument;
+  private readonly parentSlide: MockSlide;
 
   constructor(
-    mock: MockPowerPointRuntime,
+    documentModel: MockPowerPointDocument,
     parentSlide: MockSlide,
     id: string,
   ) {
-    this.mock = mock;
+    this.documentModel = documentModel;
     this.parentSlide = parentSlide;
     this.id = id;
-    this.fill = new MockFill(null);
     this.tags = new MockTagCollection(this.tagMap, (key, value) => {
       if (key === "TypstFillColor") {
         this.fill.foregroundColor = value === "disabled" ? null : value;
@@ -239,11 +322,32 @@ class MockShape implements Loadable {
 
   delete() {
     this.parentSlide.removeShape(this.id);
-    this.mock.removeSelectedShape(this.id);
+    this.documentModel.removeSelectedShape(this.id);
   }
 
   getParentSlide(): MockSlide {
     return this.parentSlide;
+  }
+
+  applySeed(seed: MockSeedShape) {
+    this.left = seed.left ?? this.left;
+    this.top = seed.top ?? this.top;
+    this.width = seed.width ?? this.width;
+    this.height = seed.height ?? this.height;
+    this.rotation = seed.rotation ?? this.rotation;
+    this.altTextTitle = seed.altTextTitle ?? this.altTextTitle;
+    this.altTextDescription = seed.altTextDescription ?? this.altTextDescription;
+    this.name = seed.name ?? this.name;
+    this.fill.foregroundColor = seed.fillColor ?? null;
+    this.svgContent = seed.svgContent ?? null;
+
+    for (const [key, value] of Object.entries(seed.tags ?? {})) {
+      this.tags.add(key, value);
+    }
+
+    if (seed.typstSource) {
+      this.customXmlParts.add(serializeTypstSource(seed.typstSource));
+    }
   }
 
   snapshot(): MockShapeSnapshot {
@@ -264,85 +368,47 @@ class MockShape implements Loadable {
     };
   }
 
-  applySeed(seed: MockSeedShape) {
-    this.left = seed.left ?? this.left;
-    this.top = seed.top ?? this.top;
-    this.width = seed.width ?? this.width;
-    this.height = seed.height ?? this.height;
-    this.rotation = seed.rotation ?? this.rotation;
-    this.altTextTitle = seed.altTextTitle ?? this.altTextTitle;
-    this.altTextDescription = seed.altTextDescription ?? this.altTextDescription;
-    this.name = seed.name ?? this.name;
-    this.fill.foregroundColor = seed.fillColor ?? null;
-    this.svgContent = seed.svgContent ?? null;
-
-    if (seed.tags) {
-      for (const [key, value] of Object.entries(seed.tags)) {
-        this.tags.add(key, value);
-      }
-    }
-
-    if (seed.typstSource) {
-      this.customXmlParts.add(serializeTypstSource(seed.typstSource));
-    }
-  }
-
   private addCustomXmlPart(xml: string): MockXmlPart {
     const documentNode = new DOMParser().parseFromString(xml, "application/xml");
-    const namespaceUri = documentNode.documentElement.namespaceURI;
-    const part = new MockXmlPart(this.mock.nextXmlPartId(), xml, namespaceUri);
+    const part = new MockXmlPart(
+      this.documentModel.nextXmlPartId(),
+      xml,
+      documentNode.documentElement.namespaceURI,
+    );
+
     this.xmlParts.push(part);
     return part;
   }
 }
 
-class MockShapeCollection extends MockCollection<MockShape> {
-  private readonly getById: (_id: string) => MockShape | undefined;
-
-  constructor(
-    getItems: () => MockShape[],
-    getById: (_id: string) => MockShape | undefined,
-  ) {
-    super(getItems);
-    this.getById = getById;
-  }
-
-  getItem(id: string): MockShape {
-    const shape = this.getById(id);
-    if (!shape) {
-      throw new Error(`Shape ${id} not found.`);
-    }
-
-    return shape;
-  }
-}
-
-class MockSlide implements Loadable {
-  readonly mock: MockPowerPointRuntime;
+class MockSlide implements Loadable, Identifiable {
   readonly id: string;
-  readonly shapes: MockShapeCollection;
   readonly isNullObject: boolean;
+  readonly shapes: MockItemCollection<MockShape>;
 
   private readonly shapeList: MockShape[] = [];
+  private readonly documentModel: MockPowerPointDocument;
 
   constructor(
-    mock: MockPowerPointRuntime,
+    documentModel: MockPowerPointDocument,
     id: string,
     isNullObject = false,
   ) {
-    this.mock = mock;
+    this.documentModel = documentModel;
     this.id = id;
     this.isNullObject = isNullObject;
-    this.shapes = new MockShapeCollection(
-      () => this.shapeList,
-      shapeId => this.shapeList.find(shape => shape.id === shapeId),
-    );
+    this.shapes = new MockItemCollection(() => this.shapeList);
   }
 
   load() {}
 
   addShape(seed: MockSeedShape = {}): MockShape {
-    const shape = new MockShape(this.mock, this, seed.id ?? this.mock.nextShapeId());
+    const shape = new MockShape(
+      this.documentModel,
+      this,
+      seed.id ?? this.documentModel.nextShapeId(),
+    );
+
     shape.applySeed(seed);
     this.shapeList.push(shape);
     return shape;
@@ -363,25 +429,6 @@ class MockSlide implements Loadable {
   }
 }
 
-class MockSlideCollection extends MockCollection<MockSlide> {
-  private readonly getById: (_id: string) => MockSlide | undefined;
-  private readonly mock: MockPowerPointRuntime;
-
-  constructor(
-    getItems: () => MockSlide[],
-    getById: (_id: string) => MockSlide | undefined,
-    mock: MockPowerPointRuntime,
-  ) {
-    super(getItems);
-    this.getById = getById;
-    this.mock = mock;
-  }
-
-  getItem(id: string): MockSlide {
-    return this.getById(id) ?? new MockSlide(this.mock, id, true);
-  }
-}
-
 class MockPageSetup implements Loadable {
   readonly slideWidth: number;
   readonly slideHeight: number;
@@ -397,77 +444,42 @@ class MockPageSetup implements Loadable {
   load() {}
 }
 
-class MockPresentation {
-  readonly slides: MockSlideCollection;
-  readonly pageSetup: MockPageSetup;
-  private readonly mock: MockPowerPointRuntime;
-
-  constructor(mock: MockPowerPointRuntime) {
-    this.mock = mock;
-    this.slides = new MockSlideCollection(
-      () => this.mock.slideList,
-      slideId => this.mock.slideList.find(slide => slide.id === slideId),
-      this.mock,
-    );
-    this.pageSetup = new MockPageSetup(this.mock.slideWidth, this.mock.slideHeight);
-  }
-
-  getSelectedShapes(): MockCollection<MockShape> {
-    return new MockCollection(() => this.mock.getSelectedShapes());
-  }
-
-  getSelectedSlides(): MockCollection<MockSlide> {
-    return new MockCollection(() => this.mock.getSelectedSlides());
-  }
-}
-
-class MockRequestContext {
-  readonly presentation: MockPresentation;
-
-  constructor(mock: MockPowerPointRuntime) {
-    this.presentation = new MockPresentation(mock);
-  }
-
-  async sync() {}
-}
-
-class MockPowerPointRuntime {
+class MockPowerPointDocument {
   slideWidth = DEFAULT_SLIDE_WIDTH;
   slideHeight = DEFAULT_SLIDE_HEIGHT;
-  slideList: MockSlide[] = [];
+  slides: MockSlide[] = [];
   selectedSlideIds: string[] = [];
   selectedShapeIds: string[] = [];
   readonly insertedSvgCalls: { slideId: string | null; svg: string }[] = [];
+
   private readonly selectionHandlers: SelectionChangedHandler[] = [];
   private shapeCounter = 1;
   private xmlCounter = 1;
 
-  constructor() {
-    this.reset();
+  constructor(seed: MockOfficeSeed = {}) {
+    this.reset(seed);
   }
 
   reset(seed: MockOfficeSeed = {}) {
     this.slideWidth = seed.slideWidth ?? DEFAULT_SLIDE_WIDTH;
     this.slideHeight = seed.slideHeight ?? DEFAULT_SLIDE_HEIGHT;
-    this.slideList = [];
+    this.slides = [];
     this.selectedSlideIds = [];
     this.selectedShapeIds = [];
     this.insertedSvgCalls.length = 0;
     this.shapeCounter = 1;
     this.xmlCounter = 1;
 
-    const slides = seed.slides && seed.slides.length > 0 ? seed.slides : [{ id: "slide-1", shapes: [] }];
-    slides.forEach((slideSeed, index) => {
+    const slideSeeds = seed.slides?.length ? seed.slides : [{ id: "slide-1", shapes: [] }];
+    slideSeeds.forEach((slideSeed, index) => {
       const slide = new MockSlide(this, slideSeed.id ?? `slide-${String(index + 1)}`);
-      this.slideList.push(slide);
-      slideSeed.shapes?.forEach((shapeSeed) => {
-        slide.addShape(shapeSeed);
-      });
+      this.slides.push(slide);
+      slideSeed.shapes?.forEach(shapeSeed => slide.addShape(shapeSeed));
     });
 
     this.selectedSlideIds = seed.selectedSlideIds?.length
       ? [...seed.selectedSlideIds]
-      : [this.slideList.at(0)?.id].filter((value): value is string => typeof value === "string");
+      : [this.slides.at(0)?.id].filter((value): value is string => typeof value === "string");
     this.selectedShapeIds = seed.selectedShapeIds ? [...seed.selectedShapeIds] : [];
   }
 
@@ -489,12 +501,12 @@ class MockPowerPointRuntime {
 
   getSelectedSlides(): MockSlide[] {
     return this.selectedSlideIds
-      .map(slideId => this.slideList.find(slide => slide.id === slideId))
+      .map(slideId => this.slides.find(slide => slide.id === slideId))
       .filter((slide): slide is MockSlide => Boolean(slide));
   }
 
   getSelectedShapes(): MockShape[] {
-    return this.slideList
+    return this.slides
       .flatMap(slide => slide.shapes.items)
       .filter(shape => this.selectedShapeIds.includes(shape.id));
   }
@@ -503,22 +515,23 @@ class MockPowerPointRuntime {
     this.selectedShapeIds = this.selectedShapeIds.filter(id => id !== shapeId);
   }
 
-  async setSelection(slideId: string, shapeIds: string[] = []) {
+  async selectShapes(slideId: string, shapeIds: string[] = []) {
     this.selectedSlideIds = [slideId];
     this.selectedShapeIds = [...shapeIds];
     await this.triggerSelectionChanged();
   }
 
   async clearSelection(slideId?: string) {
-    const fallbackSlideId = slideId ?? this.selectedSlideIds.at(0) ?? this.slideList.at(0)?.id;
+    const fallbackSlideId = slideId ?? this.selectedSlideIds.at(0) ?? this.slides.at(0)?.id;
     this.selectedSlideIds = fallbackSlideId ? [fallbackSlideId] : [];
     this.selectedShapeIds = [];
     await this.triggerSelectionChanged();
   }
 
-  insertSvg(svg: string) {
-    const targetSlide = this.getSelectedSlides().at(0) ?? this.slideList.at(0) ?? null;
+  insertSvg(svg: string): OfficeAsyncResult {
+    const targetSlide = this.getSelectedSlides().at(0) ?? this.slides.at(0) ?? null;
     this.insertedSvgCalls.push({ slideId: targetSlide?.id ?? null, svg });
+
     if (!targetSlide) {
       return { status: "failed", error: new Error("No target slide available.") };
     }
@@ -526,7 +539,7 @@ class MockPowerPointRuntime {
     const shape = targetSlide.addShape({ svgContent: svg });
     this.selectedSlideIds = [targetSlide.id];
     this.selectedShapeIds = [shape.id];
-    return { status: "succeeded", shapeId: shape.id };
+    return { status: "succeeded" };
   }
 
   snapshot(): MockOfficeSnapshot {
@@ -536,7 +549,7 @@ class MockPowerPointRuntime {
       selectedSlideIds: [...this.selectedSlideIds],
       selectedShapeIds: [...this.selectedShapeIds],
       insertedSvgCalls: this.insertedSvgCalls.map(call => ({ ...call })),
-      slides: this.slideList.map(slide => slide.snapshot()),
+      slides: this.slides.map(slide => slide.snapshot()),
     };
   }
 
@@ -545,6 +558,43 @@ class MockPowerPointRuntime {
       await handler();
     }
   }
+}
+
+// Office.js-shaped adapter around the document model.
+class MockPresentation {
+  readonly slides: MockItemCollection<MockSlide>;
+  readonly pageSetup: MockPageSetup;
+  private readonly documentModel: MockPowerPointDocument;
+
+  constructor(documentModel: MockPowerPointDocument) {
+    this.documentModel = documentModel;
+    this.slides = new MockItemCollection(
+      () => this.documentModel.slides,
+      slideId => new MockSlide(this.documentModel, slideId, true),
+    );
+    this.pageSetup = new MockPageSetup(
+      this.documentModel.slideWidth,
+      this.documentModel.slideHeight,
+    );
+  }
+
+  getSelectedShapes(): MockCollection<MockShape> {
+    return new MockCollection(() => this.documentModel.getSelectedShapes());
+  }
+
+  getSelectedSlides(): MockCollection<MockSlide> {
+    return new MockCollection(() => this.documentModel.getSelectedSlides());
+  }
+}
+
+class MockRequestContext {
+  readonly presentation: MockPresentation;
+
+  constructor(documentModel: MockPowerPointDocument) {
+    this.presentation = new MockPresentation(documentModel);
+  }
+
+  async sync() {}
 }
 
 function serializeTypstSource(source: MockTypstSource): string {
@@ -566,84 +616,63 @@ function serializeTypstSource(source: MockTypstSource): string {
   return new XMLSerializer().serializeToString(documentNode);
 }
 
-type MockGlobals = {
-  Office: {
-    HostType: { PowerPoint: "PowerPoint" };
-    EventType: { DocumentSelectionChanged: "DocumentSelectionChanged" };
-    AsyncResultStatus: { Succeeded: "succeeded"; Failed: "failed" };
-    CoercionType: { XmlSvg: "xmlSvg" };
-    actions: { associate: (_name: string, _handler: unknown) => void };
+// Browser global installation.
+function createOfficeHost(documentModel: MockPowerPointDocument): MockOfficeHost {
+  return {
+    HostType: { PowerPoint: "PowerPoint" },
+    EventType: { DocumentSelectionChanged: "DocumentSelectionChanged" },
+    AsyncResultStatus: { Succeeded: "succeeded", Failed: "failed" },
+    CoercionType: { XmlSvg: "xmlSvg" },
+    actions: {
+      associate() {},
+    },
     context: {
       document: {
-        addHandlerAsync: (_eventType: string, _handler: SelectionChangedHandler) => void;
-        setSelectedDataAsync: (
-          _data: string,
-          _options: { coercionType: string },
-          _callback: (_result: { status: string; error?: Error }) => void,
-        ) => void;
-      };
-    };
-    onReady: (_callback: OfficeReadyCallback) => Promise<void>;
-  };
-  PowerPoint: {
-    run: <T>(_callback: (_context: MockRequestContext) => Promise<T> | T) => Promise<T>;
-  };
-  __pptypstOfficeMock: {
-    reset: (_seed?: MockOfficeSeed) => void;
-    selectShapes: (_slideId: string, _shapeIds: string[]) => Promise<void>;
-    clearSelection: (_slideId?: string) => Promise<void>;
-    snapshot: () => MockOfficeSnapshot;
-  };
-  __pptypstOfficeSeed?: MockOfficeSeed;
-};
-
-const mockGlobals = globalThis as unknown as MockGlobals;
-const runtime = new MockPowerPointRuntime();
-runtime.reset(mockGlobals.__pptypstOfficeSeed);
-
-mockGlobals.Office = {
-  HostType: { PowerPoint: "PowerPoint" },
-  EventType: { DocumentSelectionChanged: "DocumentSelectionChanged" },
-  AsyncResultStatus: { Succeeded: "succeeded", Failed: "failed" },
-  CoercionType: { XmlSvg: "xmlSvg" },
-  actions: {
-    associate() {},
-  },
-  context: {
-    document: {
-      addHandlerAsync(_eventType: string, handler: SelectionChangedHandler) {
-        runtime.addSelectionHandler(handler);
-      },
-      setSelectedDataAsync(data, _options, callback) {
-        const result = runtime.insertSvg(data);
-        callback(result.status === "succeeded"
-          ? { status: mockGlobals.Office.AsyncResultStatus.Succeeded }
-          : { status: mockGlobals.Office.AsyncResultStatus.Failed, error: result.error });
+        addHandlerAsync(_eventType: string, handler: SelectionChangedHandler) {
+          documentModel.addSelectionHandler(handler);
+        },
+        setSelectedDataAsync(data, _options, callback) {
+          const result = documentModel.insertSvg(data);
+          callback(result.status === "succeeded"
+            ? { status: "succeeded" }
+            : { status: "failed", error: result.error });
+        },
       },
     },
-  },
-  async onReady(callback: OfficeReadyCallback) {
-    await callback({ host: "PowerPoint" });
-  },
-};
+    async onReady(callback: OfficeReadyCallback) {
+      await callback({ host: "PowerPoint" });
+    },
+  };
+}
 
-mockGlobals.PowerPoint = {
-  async run<T>(callback: (_context: MockRequestContext) => Promise<T> | T) {
-    return callback(new MockRequestContext(runtime));
-  },
-};
+function createPowerPointHost(documentModel: MockPowerPointDocument): MockPowerPointHost {
+  return {
+    async run<T>(callback: (_context: MockRequestContext) => Promise<T> | T) {
+      return callback(new MockRequestContext(documentModel));
+    },
+  };
+}
 
-mockGlobals.__pptypstOfficeMock = {
-  reset(seed?: MockOfficeSeed) {
-    runtime.reset(seed);
-  },
-  async selectShapes(slideId: string, shapeIds: string[]) {
-    await runtime.setSelection(slideId, shapeIds);
-  },
-  async clearSelection(slideId?: string) {
-    await runtime.clearSelection(slideId);
-  },
-  snapshot() {
-    return runtime.snapshot();
-  },
-};
+function createTestHarness(documentModel: MockPowerPointDocument): MockOfficeTestHarness {
+  return {
+    reset(seed?: MockOfficeSeed) {
+      documentModel.reset(seed);
+    },
+    async selectShapes(slideId: string, shapeIds: string[]) {
+      await documentModel.selectShapes(slideId, shapeIds);
+    },
+    async clearSelection(slideId?: string) {
+      await documentModel.clearSelection(slideId);
+    },
+    snapshot() {
+      return documentModel.snapshot();
+    },
+  };
+}
+
+const mockGlobals = globalThis as unknown as MockGlobals;
+const documentModel = new MockPowerPointDocument(mockGlobals.__pptypstOfficeSeed);
+
+mockGlobals.Office = createOfficeHost(documentModel);
+mockGlobals.PowerPoint = createPowerPointHost(documentModel);
+mockGlobals.__pptypstOfficeMock = createTestHarness(documentModel);
