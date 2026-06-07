@@ -31,3 +31,23 @@ test("previews Typst math expressions", async ({ powerPointPage, typstMock }) =>
     },
   ]);
 });
+
+test("copies the preview SVG with optional inverted colors", async ({ powerPointPage }) => {
+  await powerPointPage.previewExpression("integral_a^b f(x) dif x");
+  await powerPointPage.expectPreviewVisible();
+
+  await powerPointPage.copyPreviewSvg();
+  await expect.poll(() => powerPointPage.readClipboardText()).toContain('fill="#000000"');
+  const copiedSvg = await powerPointPage.readClipboardText();
+  expect(copiedSvg).toContain("<svg");
+  expect(copiedSvg).toContain("integral preview");
+  expect(copiedSvg).toContain('fill="#000000"');
+  expect(copiedSvg).not.toContain('style="width: 100%');
+
+  await powerPointPage.copyPreviewSvg({ invertColors: true });
+  await expect.poll(() => powerPointPage.readClipboardText()).toContain('fill="#ffffff"');
+  const invertedSvg = await powerPointPage.readClipboardText();
+  expect(invertedSvg).toContain("integral preview");
+  expect(invertedSvg).toContain('fill="#ffffff"');
+  expect(invertedSvg).not.toContain('fill="#000000"');
+});

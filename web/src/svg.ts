@@ -68,6 +68,148 @@ export function applyFillColor(svg: SVGElement, fillColor: string) {
   });
 }
 
+/**
+ * Serializes the displayed preview SVG for clipboard use.
+ */
+export function serializeSvgForClipboard(svg: SVGElement, invertColors = false): string {
+  const clipboardSvg = svg.cloneNode(true) as SVGElement;
+  removePreviewLayoutStyles(clipboardSvg);
+
+  if (invertColors) {
+    invertSvgColors(clipboardSvg);
+  }
+
+  return new XMLSerializer().serializeToString(clipboardSvg);
+}
+
+function removePreviewLayoutStyles(svg: SVGElement) {
+  const inlineStyle = svg.getAttribute("style");
+  if (!inlineStyle) {
+    return;
+  }
+
+  const style = document.createElement("span").style;
+  style.cssText = inlineStyle;
+  style.removeProperty("width");
+  style.removeProperty("height");
+  style.removeProperty("max-height");
+
+  if (style.cssText) {
+    svg.setAttribute("style", style.cssText);
+  } else {
+    svg.removeAttribute("style");
+  }
+}
+
+function invertSvgColors(svg: SVGElement) {
+  const colorAttributes = [
+    "color",
+    "fill",
+    "stroke",
+    "stop-color",
+    "flood-color",
+    "lighting-color",
+  ];
+  const colorProperties = [
+    "color",
+    "fill",
+    "stroke",
+    "stop-color",
+    "flood-color",
+    "lighting-color",
+  ];
+  const elements: Element[] = [svg, ...Array.from(svg.querySelectorAll("*"))];
+
+  elements.forEach((el) => {
+    colorAttributes.forEach((attribute) => {
+      const color = el.getAttribute(attribute);
+      const invertedColor = color ? invertCssColor(color) : null;
+      if (invertedColor) {
+        el.setAttribute(attribute, invertedColor);
+      }
+    });
+
+    const inlineStyle = el.getAttribute("style");
+    if (!inlineStyle) {
+      return;
+    }
+
+    const style = document.createElement("span").style;
+    style.cssText = inlineStyle;
+    colorProperties.forEach((property) => {
+      const color = style.getPropertyValue(property);
+      const invertedColor = color ? invertCssColor(color) : null;
+      if (invertedColor) {
+        style.setProperty(property, invertedColor, style.getPropertyPriority(property));
+      }
+    });
+    el.setAttribute("style", style.cssText);
+  });
+}
+
+function invertCssColor(color: string): string | null {
+  const value = color.trim();
+  const normalizedValue = value.toLowerCase();
+  if (!value || normalizedValue === "none" || normalizedValue.startsWith("url(")) {
+    return null;
+  }
+
+  const parserElement = document.createElement("span");
+  parserElement.style.color = value;
+  if (!parserElement.style.color) {
+    return null;
+  }
+
+  document.body.appendChild(parserElement);
+  const computedColor = window.getComputedStyle(parserElement).color;
+  document.body.removeChild(parserElement);
+
+  const parsed = computedColor.match(
+    /^rgba?\(\s*(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)(?:\s*,\s*(\d+(?:\.\d+)?|\d+(?:\.\d+)?%))?\s*\)$/,
+  );
+  if (!parsed) {
+    return null;
+  }
+
+  const red = 255 - clampColorComponent(Number(parsed[1]));
+  const green = 255 - clampColorComponent(Number(parsed[2]));
+  const blue = 255 - clampColorComponent(Number(parsed[3]));
+  const alpha = parseAlpha(parsed[4]);
+
+  if (alpha === null || alpha >= 1) {
+    return `#${toHex(red)}${toHex(green)}${toHex(blue)}`;
+  }
+
+  return `rgba(${red.toString()}, ${green.toString()}, ${blue.toString()}, ${alpha.toString()})`;
+}
+
+function clampColorComponent(value: number): number {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+  return Math.max(0, Math.min(255, Math.round(value)));
+}
+
+function parseAlpha(alpha: string | undefined): number | null {
+  if (!alpha) {
+    return null;
+  }
+
+  if (alpha.endsWith("%")) {
+    return Math.max(0, Math.min(1, Number(alpha.slice(0, -1)) / 100));
+  }
+
+  const parsedAlpha = Number(alpha);
+  if (!Number.isFinite(parsedAlpha)) {
+    return null;
+  }
+  return Math.max(0, Math.min(1, parsedAlpha));
+}
+
+function toHex(value: number): string {
+  return value.toString(16).padStart(2, "0");
+}
+
 type ParsedHexAlpha = {
   rgbHex: string;
   alpha: number;

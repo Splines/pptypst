@@ -131,6 +131,16 @@ export class PowerPointPage {
     await this.page.locator("#bulkUpdateBtn").click();
   }
 
+  async copyPreviewSvg(options: { invertColors?: boolean } = {}) {
+    await this.page.locator("#previewCopyBtn").click({
+      modifiers: options.invertColors ? ["Shift"] : [],
+    });
+  }
+
+  async readClipboardText(): Promise<string> {
+    return this.page.evaluate(() => navigator.clipboard.readText());
+  }
+
   async selectShapes(slideId: string, shapeIds: string[]) {
     await this.page.evaluate(
       async ({ selectedSlideId, selectedShapeIds }) => {

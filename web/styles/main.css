@@ -8,6 +8,11 @@
     --button-bg: #0078d4;
     --button-hover: #005a9e;
     --button-disabled: #aaaaaa;
+    --icon-button-bg: #ffffff;
+    --icon-button-hover: #f1f1f1;
+    --icon-button-border: #d5d5d5;
+    --icon-button-color: #6b6b6b;
+    --success-color: #2e8b57;
     --error-color: #b00020;
 
     &.dark-mode {
@@ -20,6 +25,11 @@
         --button-bg: #0078d4;
         --button-hover: #005a9e;
         --button-disabled: #555;
+        --icon-button-bg: #2f2f2f;
+        --icon-button-hover: #383838;
+        --icon-button-border: #4a4a4a;
+        --icon-button-color: #d0d0d0;
+        --success-color: #67c587;
         --error-color: #f48771;
     }
 }
@@ -266,12 +276,75 @@ button {
 }
 
 #previewContainer {
+    position: relative;
     margin-top: 10px;
     border: 1px dashed var(--border-color);
     padding: 10px;
     min-height: 50px;
     background: var(--bg-secondary);
     text-align: center;
+}
+
+.preview-copy-btn {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 28px;
+    height: 28px;
+    margin: 0;
+    padding: 0;
+    color: var(--icon-button-color);
+    border: 1px solid var(--icon-button-border);
+    border-radius: 4px;
+    background-color: var(--icon-button-bg);
+    cursor: pointer;
+    opacity: 0.86;
+    transition: background-color 100ms, border-color 100ms;
+
+    &:hover:not(:disabled) {
+        background-color: var(--icon-button-hover);
+        opacity: 1;
+    }
+
+    &:disabled {
+        opacity: 0;
+        cursor: default;
+        pointer-events: none;
+        visibility: hidden;
+    }
+
+    > * {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transition: opacity 220ms ease-in-out, transform 500ms ease-in-out;
+    }
+}
+
+.preview-copy-icon-clipboard {
+    width: 14px;
+    fill: currentColor;
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+}
+
+.preview-copy-icon-tick {
+    width: 12px;
+    fill: var(--success-color);
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0);
+}
+
+.preview-copy-btn.is-copied {
+    .preview-copy-icon-clipboard {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(0);
+    }
+
+    .preview-copy-icon-tick {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
+    }
 }
 
 #previewLabel {
