@@ -1,7 +1,8 @@
 import { DiagnosticMessage, typst } from "./typst.js";
-import { applyFillColor, parseAndApplySize, serializeSvgForClipboard } from "./svg.js";
+import { applyFillColor, parseAndApplySize } from "./svg.js";
 import { DOM_IDS, PREVIEW_CONFIG, STORAGE_KEYS, FILL_COLOR_DISABLED } from "./constants.js";
 import { getAreaElement, getHTMLElement, getInputElement } from "./utils/dom";
+import { setupPreviewCopyButton, setPreviewCopyButtonEnabled } from "./copy.js";
 import {
   getFillColor,
   getFontSize,
@@ -9,13 +10,10 @@ import {
   getEditorMode,
   getMathModeEnabled,
   getTypstCode,
-  setStatus,
   setButtonEnabled,
   setMathModeEnabled,
 } from "./ui";
 import { storeValue, getStoredValue } from "./utils/storage.js";
-
-let copyFeedbackTimeout: ReturnType<typeof setTimeout> | undefined;
 
 /**
  * Sets up event listeners for preview updates.
@@ -28,16 +26,8 @@ export function setupPreviewListeners() {
   const fillColorEnabled = getInputElement(DOM_IDS.FILL_COLOR_ENABLED);
   const previewFillEnabled = getInputElement(DOM_IDS.PREVIEW_FILL_ENABLED);
   const mathModeEnabled = getInputElement(DOM_IDS.MATH_MODE_ENABLED);
-  const previewCopyButton = getHTMLElement(DOM_IDS.PREVIEW_COPY_BTN) as HTMLButtonElement;
 
-  if (!window.isSecureContext) {
-    previewCopyButton.dataset.clipboardUnavailable = "true";
-    previewCopyButton.hidden = true;
-  } else {
-    previewCopyButton.addEventListener("click", (event) => {
-      void copyPreviewSvg(event.shiftKey);
-    });
-  }
+  setupPreviewCopyButton();
 
   typstInput.addEventListener("input", () => {
     updateButtonState();
@@ -196,56 +186,6 @@ export async function updatePreview() {
   if (!shouldKeepTypstFill) {
     applyFillColor(svgElement, previewFill);
   }
-}
-
-async function copyPreviewSvg(invertColors: boolean) {
-  const previewElement = getHTMLElement(DOM_IDS.PREVIEW_CONTENT);
-  const svgElement = previewElement.querySelector("svg");
-  if (!svgElement) {
-    return;
-  }
-
-  try {
-    const svgText = serializeSvgForClipboard(svgElement, invertColors);
-    await navigator.clipboard.writeText(svgText);
-    showPreviewCopyFeedback();
-  } catch {
-    setStatus("Could not copy preview SVG.", true);
-  }
-}
-
-function setPreviewCopyButtonEnabled(enabled: boolean) {
-  const previewCopyButton = getHTMLElement(DOM_IDS.PREVIEW_COPY_BTN) as HTMLButtonElement;
-  if (previewCopyButton.dataset.clipboardUnavailable === "true") {
-    return;
-  }
-
-  if (!enabled) {
-    previewCopyButton.hidden = true;
-    previewCopyButton.classList.remove("is-copied");
-    if (copyFeedbackTimeout) {
-      clearTimeout(copyFeedbackTimeout);
-      copyFeedbackTimeout = undefined;
-    }
-  } else {
-    previewCopyButton.hidden = false;
-  }
-
-  previewCopyButton.disabled = !enabled;
-}
-
-function showPreviewCopyFeedback() {
-  const previewCopyButton = getHTMLElement(DOM_IDS.PREVIEW_COPY_BTN);
-  previewCopyButton.classList.add("is-copied");
-
-  if (copyFeedbackTimeout) {
-    clearTimeout(copyFeedbackTimeout);
-  }
-
-  copyFeedbackTimeout = setTimeout(() => {
-    previewCopyButton.classList.remove("is-copied");
-    copyFeedbackTimeout = undefined;
-  }, 1300);
 }
 
 /**
