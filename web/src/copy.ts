@@ -7,22 +7,6 @@ import { serializeSvgForClipboard } from "./svg.js";
 import { setStatus } from "./ui.js";
 import { getButtonElement, getHTMLElement } from "./utils/dom.js";
 
-type ClipboardTextWriter = {
-  writeText: (_text: string) => Promise<void>;
-};
-
-type ClipboardSvgWriter = ClipboardTextWriter & {
-  write?: (_items: ClipboardItem[]) => Promise<void>;
-};
-
-type ClipboardItemConstructorLike = {
-  new (
-    _items: Record<string, string | Blob | PromiseLike<string | Blob>>,
-    _options?: ClipboardItemOptions,
-  ): ClipboardItem;
-  supports?: (_type: string) => boolean;
-};
-
 let copyFeedbackTimeout: ReturnType<typeof setTimeout> | undefined;
 let clipboardUnavailable = false;
 
@@ -31,9 +15,8 @@ let clipboardUnavailable = false;
  */
 export function setupPreviewCopyButton() {
   const previewCopyButton = getPreviewCopyButton();
-  const clipboard = getClipboardWriter();
 
-  if (!window.isSecureContext || !clipboard) {
+  if (!isClipboardAvailable()) {
     clipboardUnavailable = true;
     previewCopyButton.hidden = true;
     return;
@@ -85,69 +68,39 @@ async function copyPreviewSvg(invertColors: boolean) {
   }
 }
 
+/**
+ * Writes the SVG as a rich clipboard item so it can be pasted into vector
+ * editors, falling back to plain text when that is not possible.
+ */
 async function writeSvgToClipboard(svgText: string) {
-  const clipboard = getClipboardWriter();
-  if (!clipboard) {
-    throw new Error("Clipboard API is not available.");
-  }
-
-  const ClipboardItemConstructor = getClipboardItemConstructor();
-  if (clipboard.write && ClipboardItemConstructor && clipboardItemSupportsSvg(ClipboardItemConstructor)) {
+  if (hasClipboardItem()) {
     try {
-      await clipboard.write([
-        new ClipboardItemConstructor({
+      await navigator.clipboard.write([
+        new ClipboardItem({
           "image/svg+xml": new Blob([svgText], { type: "image/svg+xml" }),
           "text/plain": new Blob([svgText], { type: "text/plain" }),
         }),
       ]);
       return;
     } catch {
-      // Some hosts expose rich clipboard APIs but reject SVG items at runtime.
+      // Some hosts expose ClipboardItem but reject SVG payloads at runtime,
+      // so we fall back to writing plain text below.
     }
   }
 
-  await clipboard.writeText(svgText);
+  await navigator.clipboard.writeText(svgText);
 }
 
-function getClipboardWriter(): ClipboardSvgWriter | null {
-  const clipboard = Reflect.get(navigator, "clipboard") as unknown;
-  if (!isRecord(clipboard)) {
-    return null;
-  }
-
-  const writeText = clipboard.writeText;
-  if (typeof writeText !== "function") {
-    return null;
-  }
-
-  const write = clipboard.write;
-  if (write !== undefined && typeof write !== "function") {
-    return null;
-  }
-
-  return {
-    writeText: async (text) => {
-      await writeText.call(clipboard, text);
-    },
-    write: typeof write === "function"
-      ? async (items) => {
-        await write.call(clipboard, items);
-      }
-      : undefined,
-  };
+function isClipboardAvailable(): boolean {
+  return window.isSecureContext && isDefined(navigator.clipboard);
 }
 
-function getClipboardItemConstructor(): ClipboardItemConstructorLike | null {
-  const ClipboardItemConstructor = Reflect.get(globalThis, "ClipboardItem") as unknown;
-  return isClipboardItemConstructor(ClipboardItemConstructor) ? ClipboardItemConstructor : null;
+function hasClipboardItem(): boolean {
+  return isDefined(globalThis.ClipboardItem);
 }
 
-function clipboardItemSupportsSvg(ClipboardItemConstructor: ClipboardItemConstructorLike): boolean {
-  if (typeof ClipboardItemConstructor.supports !== "function") {
-    return true;
-  }
-
-  return ClipboardItemConstructor.supports("image/svg+xml");
+function isDefined(value: unknown): boolean {
+  return value !== undefined;
 }
 
 function showPreviewCopyFeedback() {
@@ -166,12 +119,4 @@ function showPreviewCopyFeedback() {
 
 function getPreviewCopyButton(): HTMLButtonElement {
   return getButtonElement(DOM_IDS.PREVIEW_COPY_BTN);
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
-
-function isClipboardItemConstructor(value: unknown): value is ClipboardItemConstructorLike {
-  return typeof value === "function";
 }
