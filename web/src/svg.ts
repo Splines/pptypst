@@ -74,6 +74,7 @@ export function applyFillColor(svg: SVGElement, fillColor: string) {
 export function serializeSvgForClipboard(svg: SVGElement, invertColors = false): string {
   const clipboardSvg = svg.cloneNode(true) as SVGElement;
   removePreviewLayoutStyles(clipboardSvg);
+  normalizeAlphaHexColors(clipboardSvg);
 
   if (invertColors) {
     invertSvgColors(clipboardSvg);
