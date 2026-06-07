@@ -123,6 +123,10 @@ export class PowerPointPage {
     await this.page.locator("#fillColor").fill(fillColor);
   }
 
+  async setPreviewTypstFillEnabled(enabled: boolean) {
+    await this.page.locator("#previewFillEnabled").setChecked(enabled);
+  }
+
   async insertOrUpdate() {
     await this.page.locator("#insertBtn").click();
   }

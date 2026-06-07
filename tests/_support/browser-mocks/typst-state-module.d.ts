@@ -8,6 +8,7 @@ declare module "*__test__/typst-state.js" {
       artifactContent: number[];
       data_selection: Record<string, boolean>;
     }[];
+    previewSvg: string;
   };
 
   export function typstMockReady(): boolean;
@@ -21,4 +22,6 @@ declare module "*__test__/typst-state.js" {
       data_selection: Record<string, boolean>;
     }[];
   };
+
+  export function setTypstMockPreviewSvg(_svg: string): void;
 }

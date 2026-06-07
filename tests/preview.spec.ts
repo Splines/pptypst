@@ -51,3 +51,29 @@ test("copies the preview SVG with optional inverted colors", async ({ powerPoint
   expect(invertedSvg).toContain('fill="#ffffff"');
   expect(invertedSvg).not.toContain('fill="#000000"');
 });
+
+test("copies preview SVGs with alpha fills normalized for compatibility",
+  async ({ powerPointPage, typstMock }) => {
+    await typstMock.setPreviewSvg([
+      '<svg xmlns="http://www.w3.org/2000/svg" width="196.39001" height="93.14115">',
+      '<path fill="#ff000032" stroke="#000" d="M 0 0 L 10 0 L 10 10 Z"/>',
+      '<path fill="#0000ff32" stroke="#000" d="M 20 0 L 30 0 L 30 10 Z"/>',
+      "</svg>",
+    ].join(""));
+
+    await powerPointPage.setFillColor(null);
+    await powerPointPage.setPreviewTypstFillEnabled(true);
+    await powerPointPage.previewExpression("compatibility check");
+    await powerPointPage.expectPreviewVisible();
+
+    await powerPointPage.copyPreviewSvg();
+    await expect.poll(() => powerPointPage.readClipboardText())
+      .toContain('fill-opacity="0.19607843137254902"');
+
+    const copiedSvg = await powerPointPage.readClipboardText();
+    expect(copiedSvg).toContain('fill="#ff0000"');
+    expect(copiedSvg).toContain('fill="#0000ff"');
+    expect(copiedSvg).toContain('fill-opacity="0.19607843137254902"');
+    expect(copiedSvg).not.toContain("#ff000032");
+    expect(copiedSvg).not.toContain("#0000ff32");
+  });

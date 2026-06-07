@@ -8,12 +8,6 @@ type RenderSvgOptions = {
   data_selection: Record<string, boolean>;
 };
 
-const previewSvg = [
-  '<svg xmlns="http://www.w3.org/2000/svg" width="160" height="40">',
-  '<text x="0" y="20" fill="#000">integral preview</text>',
-  "</svg>",
-].join("");
-
 export function createTypstCompiler() {
   return {
     init(options: CompilerInitOptions) {
@@ -46,7 +40,7 @@ export function createTypstRenderer() {
         artifactContent: Array.from(options.artifactContent),
         data_selection: options.data_selection,
       });
-      return Promise.resolve(previewSvg);
+      return Promise.resolve(typstMockState.previewSvg);
     },
   };
 }

@@ -57,6 +57,16 @@ export class TypstMock {
     }, stateModuleUrl);
   }
 
+  /** Overrides the SVG that the mocked renderer returns for subsequent preview renders. */
+  async setPreviewSvg(svg: string) {
+    await this.page.evaluate(async ({ moduleUrl, previewSvg }) => {
+      const stateModule = await import(moduleUrl) as {
+        setTypstMockPreviewSvg: (_svg: string) => void;
+      };
+      stateModule.setTypstMockPreviewSvg(previewSvg);
+    }, { moduleUrl: stateModuleUrl, previewSvg: svg });
+  }
+
   private async routeModule(url: string, fileName: string) {
     await this.page.route(url, async (route) => {
       await route.fulfill({
