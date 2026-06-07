@@ -81,7 +81,9 @@ export class PowerPointPage {
   /** Opens the task pane and waits until the add-in has finished its initial setup. */
   async goto() {
     await this.page.goto("powerpoint.html");
-    await expect(this.page.locator("#insertBtn")).toContainText(/Insert|Update/);
+    await expect(this.page.locator("#insertBtn")).toContainText(
+      /Insert|Update/,
+    );
   }
 
   /** Seeds the browser Office mock and reloads the task pane around that model. */
@@ -100,7 +102,7 @@ export class PowerPointPage {
   }
 
   async setPreamble(preamble: string) {
-    if (!await this.page.locator("#preambleInput").isVisible()) {
+    if (!(await this.page.locator("#preambleInput").isVisible())) {
       await this.page.locator("#preambleSummary").click();
     }
     await this.page.locator("#preambleInput").fill(preamble);
@@ -130,13 +132,19 @@ export class PowerPointPage {
   }
 
   async selectShapes(slideId: string, shapeIds: string[]) {
-    await this.page.evaluate(async ({ selectedSlideId, selectedShapeIds }) => {
-      const officeWindow = window as OfficeMockWindow;
-      await officeWindow.__pptypstOfficeMock.selectShapes(selectedSlideId, selectedShapeIds);
-    }, { selectedSlideId: slideId, selectedShapeIds: shapeIds });
+    await this.page.evaluate(
+      async ({ selectedSlideId, selectedShapeIds }) => {
+        const officeWindow = window as OfficeMockWindow;
+        await officeWindow.__pptypstOfficeMock.selectShapes(
+          selectedSlideId,
+          selectedShapeIds,
+        );
+      },
+      { selectedSlideId: slideId, selectedShapeIds: shapeIds },
+    );
   }
 
-  async clearSelection(slideId = "slide-1") {
+  async clearSelection(slideId?: string) {
     await this.page.evaluate(async (selectedSlideId) => {
       const officeWindow = window as OfficeMockWindow;
       await officeWindow.__pptypstOfficeMock.clearSelection(selectedSlideId);
