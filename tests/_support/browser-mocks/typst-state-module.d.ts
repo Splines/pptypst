@@ -1,4 +1,4 @@
-declare module "https://127.0.0.1:3157/pptypst/__test__/typst-state.js" {
+declare module "*__test__/typst-state.js" {
   export const typstMockState: {
     rendererInitOptions: { hasGetModule: boolean }[];
     addSourceCalls: { path: string; source: string }[];

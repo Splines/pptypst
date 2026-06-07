@@ -1,4 +1,4 @@
-import { typstMockState } from "https://127.0.0.1:3157/pptypst/__test__/typst-state.js";
+import { typstMockState } from "/pptypst/__test__/typst-state.js";
 
 type CompilerInitOptions = { beforeBuild: unknown[]; getModule: unknown };
 type CompileOptions = { mainFilePath: string };

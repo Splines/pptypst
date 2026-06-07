@@ -2,6 +2,10 @@ import { defineConfig, devices } from "@playwright/test";
 import process from "node:process";
 
 const isCI = Boolean(process.env.CI);
+const testHost = "127.0.0.1";
+const testPort = "3157";
+const testOrigin = `http://${testHost}:${testPort}`;
+const testBaseUrl = `${testOrigin}/pptypst/`;
 
 /**
  * See https://playwright.dev/docs/test-configuration.
@@ -21,8 +25,7 @@ export default defineConfig({
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     /* Base URL to use in actions like `await page.goto('')`. */
-    baseURL: "https://127.0.0.1:3157/pptypst/",
-    ignoreHTTPSErrors: true,
+    baseURL: testBaseUrl,
   },
 
   /* Configure projects for major browsers */
@@ -35,10 +38,13 @@ export default defineConfig({
 
   /* Run your local dev server before starting the tests */
   webServer: {
-    command: "npm run dev -- --host 127.0.0.1 --port 3157 --strictPort",
-    url: "https://127.0.0.1:3157/pptypst/powerpoint.html",
+    command: `npm run dev -- --host ${testHost} --port ${testPort} --strictPort`,
+    env: {
+      ...process.env,
+      PPTYPST_USE_HTTPS: "false",
+    },
+    url: `${testBaseUrl}powerpoint.html`,
     reuseExistingServer: !isCI,
     timeout: 120_000,
-    ignoreHTTPSErrors: true,
   },
 });

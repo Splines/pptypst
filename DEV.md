@@ -37,6 +37,8 @@ mkcert -cert-file web/certs/localhost.crt -key-file web/certs/localhost.key loca
 
 If you're on WSL, follow [these steps](https://github.com/microsoft/WSL/issues/3161#issuecomment-451863149). For more background, see [this guide](https://240dc.com/wsl2-add-a-local-ssl-certificate-with-mkcert/), but rather execute the commands as shown in the first link. It's a bit tedious, but you will get there.
 
+Playwright tests do not need those certificates. The local and CI test setup starts Vite over plain `http` because the Office APIs are mocked in that scenario.
+
 ### Debug
 
 In PowerPoint, press `Ctrl+Shift+I` when the focus is on the Add-in task pane. This will open the dev console of the embedded web view where you can see network requests, the console output etc.
