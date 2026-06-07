@@ -216,6 +216,8 @@ type ParsedHexAlpha = {
   alpha: number;
 };
 
+type ColorOpacityAttributes = Record<string, string>;
+
 /**
  * Parses #RGBA or #RRGGBBAA colors into RGB + alpha.
  */
@@ -249,6 +251,29 @@ function parseHexWithAlpha(value: string): ParsedHexAlpha | null {
   return null;
 }
 
+function parseRgbaWithAlpha(value: string): ParsedHexAlpha | null {
+  const parsed = value.trim().match(
+    /^rgba\(\s*(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?|\d+(?:\.\d+)?%)\s*\)$/,
+  );
+  if (!parsed) {
+    return null;
+  }
+
+  const alpha = parseAlpha(parsed[4]);
+  if (alpha === null || alpha >= 1) {
+    return null;
+  }
+
+  return {
+    rgbHex: `#${toHex(clampColorComponent(Number(parsed[1])))}${toHex(clampColorComponent(Number(parsed[2])))}${toHex(clampColorComponent(Number(parsed[3])))}`,
+    alpha,
+  };
+}
+
+function parseColorWithAlpha(value: string): ParsedHexAlpha | null {
+  return parseHexWithAlpha(value) || parseRgbaWithAlpha(value);
+}
+
 /**
  * Converts alpha hex colors to RGB + explicit opacity attributes.
  *
@@ -256,7 +281,7 @@ function parseHexWithAlpha(value: string): ParsedHexAlpha | null {
  * these to maximize compatibility when inserting shapes.
  */
 export function normalizeAlphaHexColors(svg: SVGElement) {
-  const colorToOpacityAttr: Record<string, string> = {
+  const colorToOpacityAttr: ColorOpacityAttributes = {
     "fill": "fill-opacity",
     "stroke": "stroke-opacity",
     "stop-color": "stop-opacity",
@@ -265,22 +290,58 @@ export function normalizeAlphaHexColors(svg: SVGElement) {
   const elements: Element[] = [svg, ...Array.from(svg.querySelectorAll("*"))];
   elements.forEach((el) => {
     Object.entries(colorToOpacityAttr).forEach(([colorAttr, opacityAttr]) => {
-      const value = el.getAttribute(colorAttr);
-      if (!value) {
-        return;
-      }
-
-      const parsed = parseHexWithAlpha(value);
-      if (!parsed) {
-        return;
-      }
-
-      el.setAttribute(colorAttr, parsed.rgbHex);
-
-      const existingOpacity = parseFloat(el.getAttribute(opacityAttr) || "1");
-      const safeOpacity = Number.isFinite(existingOpacity) ? existingOpacity : 1;
-      const combinedOpacity = Math.max(0, Math.min(1, safeOpacity * parsed.alpha));
-      el.setAttribute(opacityAttr, combinedOpacity.toString());
+      normalizeAlphaColorAttribute(el, colorAttr, opacityAttr);
     });
+    normalizeAlphaColorStyles(el, colorToOpacityAttr);
   });
+}
+
+function normalizeAlphaColorAttribute(el: Element, colorAttr: string, opacityAttr: string) {
+  const value = el.getAttribute(colorAttr);
+  if (!value) {
+    return;
+  }
+
+  const parsed = parseColorWithAlpha(value);
+  if (!parsed) {
+    return;
+  }
+
+  el.setAttribute(colorAttr, parsed.rgbHex);
+  const combinedOpacity = combineOpacity(el.getAttribute(opacityAttr), parsed.alpha);
+  el.setAttribute(opacityAttr, combinedOpacity.toString());
+}
+
+function normalizeAlphaColorStyles(el: Element, colorToOpacityAttr: ColorOpacityAttributes) {
+  const inlineStyle = el.getAttribute("style");
+  if (!inlineStyle) {
+    return;
+  }
+
+  const style = document.createElement("span").style;
+  style.cssText = inlineStyle;
+
+  Object.entries(colorToOpacityAttr).forEach(([colorProperty, opacityProperty]) => {
+    const value = style.getPropertyValue(colorProperty);
+    if (!value) {
+      return;
+    }
+
+    const parsed = parseColorWithAlpha(value);
+    if (!parsed) {
+      return;
+    }
+
+    style.setProperty(colorProperty, parsed.rgbHex, style.getPropertyPriority(colorProperty));
+    const combinedOpacity = combineOpacity(style.getPropertyValue(opacityProperty), parsed.alpha);
+    style.setProperty(opacityProperty, combinedOpacity.toString(), style.getPropertyPriority(opacityProperty));
+  });
+
+  el.setAttribute("style", style.cssText);
+}
+
+function combineOpacity(opacity: string | null, alpha: number): number {
+  const existingOpacity = parseFloat(opacity || "1");
+  const safeOpacity = Number.isFinite(existingOpacity) ? existingOpacity : 1;
+  return Math.max(0, Math.min(1, safeOpacity * alpha));
 }
