@@ -22,7 +22,7 @@ jobs:
         run: npm ci # ci: "clean install"
 
       - name: Install Playwright Chromium deps & browser
-        run: npx playwright install-deps chromium && npx playwright install chromium --no-shell
+        run: npx playwright install-deps chromium && npx playwright install chromium
 
       - name: Run Playwright tests
         run: npx playwright test
