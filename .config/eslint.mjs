@@ -99,6 +99,7 @@ export default defineConfig([
                 disallowTabs: true,
                 disallowInAssignment: true,
             }],
+            "@html-eslint/no-extra-spacing-tags": ["error", {enforceBeforeSelfClose: true}],
         },
     },
     {

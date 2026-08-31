@@ -49,6 +49,7 @@ export type OfficeSnapshot = {
 
 type OfficeMockWindow = Window & typeof globalThis & {
   __pptypstOfficeSeed?: OfficeMockSeed;
+  __pptypstClipboardWriteTypes?: string[];
   __pptypstOfficeMock: {
     reset: (_seed?: OfficeMockSeed) => void;
     selectShapes: (_slideId: string, _shapeIds: string[]) => Promise<void>;
@@ -129,12 +130,49 @@ export class PowerPointPage {
     await this.page.locator("#fillColor").fill(fillColor);
   }
 
+  async setPreviewTypstFillEnabled(enabled: boolean) {
+    await this.page.locator("#previewFillEnabled").setChecked(enabled);
+  }
+
   async insertOrUpdate() {
     await this.page.locator("#insertBtn").click();
   }
 
   async bulkUpdateFontSize() {
     await this.page.locator("#bulkUpdateBtn").click();
+  }
+
+  async copyPreviewSvg(options: { invertColors?: boolean } = {}) {
+    await this.page.locator("#previewCopyBtn").click({
+      modifiers: options.invertColors ? ["Shift"] : [],
+    });
+  }
+
+  async readClipboardText(): Promise<string> {
+    return this.page.evaluate(() => navigator.clipboard.readText());
+  }
+
+  async recordClipboardWrites() {
+    await this.page.evaluate(() => {
+      const appWindow = window as OfficeMockWindow;
+      const originalWriteText = navigator.clipboard.writeText.bind(navigator.clipboard);
+      Object.defineProperty(navigator.clipboard, "write", {
+        configurable: true,
+        value: async (items: ClipboardItem[]) => {
+          appWindow.__pptypstClipboardWriteTypes = items.flatMap(item => item.types);
+          const firstItem = items[0];
+          const textBlob = await firstItem.getType("text/plain");
+          await originalWriteText(await textBlob.text());
+        },
+      });
+    });
+  }
+
+  async clipboardWriteTypes(): Promise<string[]> {
+    return this.page.evaluate(() => {
+      const appWindow = window as OfficeMockWindow;
+      return appWindow.__pptypstClipboardWriteTypes || [];
+    });
   }
 
   async selectShapes(slideId: string, shapeIds: string[]) {

@@ -2,6 +2,7 @@ import { DiagnosticMessage, typst } from "./typst.js";
 import { applyFillColor, parseAndApplySize } from "./svg.js";
 import { DOM_IDS, PREVIEW_CONFIG, STORAGE_KEYS, FILL_COLOR_DISABLED } from "./constants.js";
 import { getAreaElement, getHTMLElement, getInputElement } from "./utils/dom";
+import { setupPreviewCopyButton, setPreviewCopyButtonEnabled } from "./copy.js";
 import {
   getFillColor,
   getFontSize,
@@ -25,6 +26,8 @@ export function setupPreviewListeners() {
   const fillColorEnabled = getInputElement(DOM_IDS.FILL_COLOR_ENABLED);
   const previewFillEnabled = getInputElement(DOM_IDS.PREVIEW_FILL_ENABLED);
   const mathModeEnabled = getInputElement(DOM_IDS.MATH_MODE_ENABLED);
+
+  setupPreviewCopyButton();
 
   typstInput.addEventListener("input", () => {
     updateButtonState();
@@ -75,6 +78,7 @@ export function setupPreviewListeners() {
 
   syncPreviewFillToggleState(fillColorEnabled.checked);
   updateMathModeVisuals();
+  setPreviewCopyButtonEnabled(false);
 }
 
 /**
@@ -130,10 +134,15 @@ export function updateMathModeVisuals() {
   }
 }
 
+// Bumped on every updatePreview() call so a slow compilation cannot overwrite
+// the preview or copy state produced by a newer one.
+let latestPreviewRequestId = 0;
+
 /**
  * Updates the preview panel with compiled SVG.
  */
 export async function updatePreview() {
+  const requestId = ++latestPreviewRequestId;
   const rawCode = getTypstCode().trim();
   const preamble = getPreambleCode();
   const fontSize = getFontSize();
@@ -144,11 +153,16 @@ export async function updatePreview() {
 
   if (!rawCode) {
     previewElement.innerHTML = "";
+    setPreviewCopyButtonEnabled(false);
     diagnosticsContainer.style.display = "none";
     return;
   }
 
   const result = await typst({ body: rawCode, preamble }, fontSize, mathMode);
+
+  if (requestId !== latestPreviewRequestId) {
+    return;
+  }
 
   if (result.diagnostics && result.diagnostics.length > 0) {
     diagnosticsContainer.style.display = "block";
@@ -159,6 +173,7 @@ export async function updatePreview() {
 
   if (!result.svg) {
     previewElement.innerHTML = "";
+    setPreviewCopyButtonEnabled(false);
     return;
   }
 
@@ -172,6 +187,7 @@ export async function updatePreview() {
   svgElement.style.width = "100%";
   svgElement.style.height = "auto";
   svgElement.style.maxHeight = PREVIEW_CONFIG.MAX_HEIGHT;
+  setPreviewCopyButtonEnabled(true);
 
   const isDarkMode = document.documentElement.classList.contains("dark-mode");
   const previewFill = isDarkMode ? PREVIEW_CONFIG.DARK_MODE_FILL : PREVIEW_CONFIG.LIGHT_MODE_FILL;

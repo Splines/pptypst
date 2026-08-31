@@ -26,6 +26,8 @@ export default defineConfig({
   use: {
     /* Base URL to use in actions like `await page.goto('')`. */
     baseURL: testBaseUrl,
+    /* The preview copy button writes to the clipboard. */
+    permissions: ["clipboard-read", "clipboard-write"],
   },
 
   /* Configure projects for major browsers */
