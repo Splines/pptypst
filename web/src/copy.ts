@@ -63,7 +63,8 @@ async function copyPreviewSvg(invertColors: boolean) {
     const svgText = serializeSvgForClipboard(svgElement, invertColors);
     await writeSvgToClipboard(svgText);
     showPreviewCopyFeedback();
-  } catch {
+  } catch (error) {
+    console.warn("Could not copy preview SVG:", error);
     setStatus("Could not copy preview SVG.", true);
   }
 }
@@ -82,9 +83,10 @@ async function writeSvgToClipboard(svgText: string) {
         }),
       ]);
       return;
-    } catch {
+    } catch (error) {
       // Some hosts expose ClipboardItem but reject SVG payloads at runtime,
       // so we fall back to writing plain text below.
+      console.warn("Rich SVG clipboard write failed, falling back to text:", error);
     }
   }
 
