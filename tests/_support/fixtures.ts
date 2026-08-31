@@ -22,14 +22,7 @@ export { expect };
 const extendedTest = base.extend<PptypstFixtures>({
   // https://playwright.dev/docs/test-fixtures#adding-global-beforeeachaftereach-hooks
   _forEachTest: [
-    async ({ baseURL, context, page }, use) => {
-      if (baseURL) {
-        await context.grantPermissions(
-          ["clipboard-read", "clipboard-write"],
-          { origin: new URL(baseURL).origin },
-        );
-      }
-
+    async ({ page }, use) => {
       await page.addInitScript(() => {
         window.localStorage.clear();
       });
