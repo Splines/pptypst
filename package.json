@@ -15,10 +15,10 @@
   "devDependencies": {
     "@eslint/css": "^1.1",
     "@eslint/js": "^10.0.1",
-    "@html-eslint/eslint-plugin": "^0.59",
+    "@html-eslint/eslint-plugin": "^0.65",
     "@playwright/test": "^1.58.2",
     "@stylistic/eslint-plugin": "^5.7",
-    "@types/node": "^25.5.0",
+    "@types/node": "^26.4",
     "@types/office-js": "^1.0",
     "eslint": "^10.2",
     "globals": "^17.5",
@@ -27,7 +27,7 @@
     "office-addin-dev-settings": "^3.0",
     "office-addin-manifest": "^2.1",
     "typescript": "^6.0",
-    "typescript-eslint": "^8.53",
+    "typescript-eslint": "^8.69",
     "vite": "^8.0"
   },
   "dependencies": {
