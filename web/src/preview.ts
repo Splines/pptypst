@@ -134,10 +134,15 @@ export function updateMathModeVisuals() {
   }
 }
 
+// Bumped on every updatePreview() call so a slow compilation cannot overwrite
+// the preview or copy state produced by a newer one.
+let latestPreviewRequestId = 0;
+
 /**
  * Updates the preview panel with compiled SVG.
  */
 export async function updatePreview() {
+  const requestId = ++latestPreviewRequestId;
   const rawCode = getTypstCode().trim();
   const preamble = getPreambleCode();
   const fontSize = getFontSize();
@@ -155,8 +160,7 @@ export async function updatePreview() {
 
   const result = await typst({ body: rawCode, preamble }, fontSize, mathMode);
 
-  // A newer keystroke might have arrived while Typst was compiling
-  if (getTypstCode().trim() !== rawCode) {
+  if (requestId !== latestPreviewRequestId) {
     return;
   }
 
