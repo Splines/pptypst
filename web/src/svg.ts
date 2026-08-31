@@ -341,7 +341,11 @@ function normalizeAlphaColorStyles(el: Element, colorToOpacityAttr: ColorOpacity
 }
 
 function combineOpacity(opacity: string | null, alpha: number): number {
-  const existingOpacity = parseFloat(opacity || "1");
-  const safeOpacity = Number.isFinite(existingOpacity) ? existingOpacity : 1;
-  return Math.max(0, Math.min(1, safeOpacity * alpha));
+  const raw = (opacity || "1").trim();
+  const isPercent = raw.endsWith("%");
+  const parsed = parseFloat(isPercent ? raw.slice(0, -1) : raw);
+  const existingOpacity = Number.isFinite(parsed)
+    ? (isPercent ? parsed / 100 : parsed)
+    : 1;
+  return Math.max(0, Math.min(1, existingOpacity * alpha));
 }
