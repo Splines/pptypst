@@ -68,10 +68,164 @@ export function applyFillColor(svg: SVGElement, fillColor: string) {
   });
 }
 
+/**
+ * Serializes the displayed preview SVG for clipboard use.
+ */
+export function serializeSvgForClipboard(svg: SVGElement, invertColors = false): string {
+  const clipboardSvg = svg.cloneNode(true) as SVGElement;
+  removePreviewLayoutStyles(clipboardSvg);
+
+  if (invertColors) {
+    invertSvgColors(clipboardSvg);
+  }
+
+  normalizeAlphaHexColors(clipboardSvg);
+
+  return new XMLSerializer().serializeToString(clipboardSvg);
+}
+
+function removePreviewLayoutStyles(svg: SVGElement) {
+  const inlineStyle = svg.getAttribute("style");
+  if (!inlineStyle) {
+    return;
+  }
+
+  const style = document.createElement("span").style;
+  style.cssText = inlineStyle;
+  style.removeProperty("width");
+  style.removeProperty("height");
+  style.removeProperty("max-height");
+
+  if (style.cssText) {
+    svg.setAttribute("style", style.cssText);
+  } else {
+    svg.removeAttribute("style");
+  }
+}
+
+const SVG_COLOR_KEYS = [
+  "color",
+  "fill",
+  "stroke",
+  "stop-color",
+  "flood-color",
+  "lighting-color",
+];
+
+function invertSvgColors(svg: SVGElement) {
+  const elements: Element[] = [svg, ...Array.from(svg.querySelectorAll("*"))];
+
+  elements.forEach((el) => {
+    SVG_COLOR_KEYS.forEach((attribute) => {
+      const color = el.getAttribute(attribute);
+      const invertedColor = color ? invertCssColor(color) : null;
+      if (invertedColor) {
+        el.setAttribute(attribute, invertedColor);
+      }
+    });
+
+    const inlineStyle = el.getAttribute("style");
+    if (!inlineStyle) {
+      return;
+    }
+
+    const style = document.createElement("span").style;
+    style.cssText = inlineStyle;
+    const before = style.cssText;
+    SVG_COLOR_KEYS.forEach((property) => {
+      const color = style.getPropertyValue(property);
+      const invertedColor = color ? invertCssColor(color) : null;
+      if (invertedColor) {
+        style.setProperty(property, invertedColor, style.getPropertyPriority(property));
+      }
+    });
+    if (style.cssText !== before) {
+      el.setAttribute("style", style.cssText);
+    }
+  });
+}
+
+const invertedColorCache = new Map<string, string | null>();
+
+function invertCssColor(color: string): string | null {
+  const value = color.trim();
+  const cached = invertedColorCache.get(value);
+  if (cached !== undefined) {
+    return cached;
+  }
+  const inverted = computeInvertedCssColor(value);
+  invertedColorCache.set(value, inverted);
+  return inverted;
+}
+
+function computeInvertedCssColor(value: string): string | null {
+  const normalizedValue = value.toLowerCase();
+  if (!value || normalizedValue === "none" || normalizedValue.startsWith("url(")) {
+    return null;
+  }
+
+  const parserElement = document.createElement("span");
+  parserElement.style.color = value;
+  if (!parserElement.style.color) {
+    return null;
+  }
+
+  document.body.appendChild(parserElement);
+  const computedColor = window.getComputedStyle(parserElement).color;
+  document.body.removeChild(parserElement);
+
+  const parsed = computedColor.match(
+    /^rgba?\(\s*(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)(?:\s*,\s*(\d+(?:\.\d+)?|\d+(?:\.\d+)?%))?\s*\)$/,
+  );
+  if (!parsed) {
+    return null;
+  }
+
+  const red = 255 - clampColorComponent(Number(parsed[1]));
+  const green = 255 - clampColorComponent(Number(parsed[2]));
+  const blue = 255 - clampColorComponent(Number(parsed[3]));
+  const alpha = parseAlpha(parsed[4]);
+
+  if (alpha === null || alpha >= 1) {
+    return `#${toHex(red)}${toHex(green)}${toHex(blue)}`;
+  }
+
+  return `rgba(${red.toString()}, ${green.toString()}, ${blue.toString()}, ${alpha.toString()})`;
+}
+
+function clampColorComponent(value: number): number {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+  return Math.max(0, Math.min(255, Math.round(value)));
+}
+
+function parseAlpha(alpha: string | undefined): number | null {
+  if (!alpha) {
+    return null;
+  }
+
+  if (alpha.endsWith("%")) {
+    return Math.max(0, Math.min(1, Number(alpha.slice(0, -1)) / 100));
+  }
+
+  const parsedAlpha = Number(alpha);
+  if (!Number.isFinite(parsedAlpha)) {
+    return null;
+  }
+  return Math.max(0, Math.min(1, parsedAlpha));
+}
+
+function toHex(value: number): string {
+  return value.toString(16).padStart(2, "0");
+}
+
 type ParsedHexAlpha = {
   rgbHex: string;
   alpha: number;
 };
+
+type ColorOpacityAttributes = Record<string, string>;
 
 /**
  * Parses #RGBA or #RRGGBBAA colors into RGB + alpha.
@@ -106,6 +260,29 @@ function parseHexWithAlpha(value: string): ParsedHexAlpha | null {
   return null;
 }
 
+function parseRgbaWithAlpha(value: string): ParsedHexAlpha | null {
+  const parsed = value.trim().match(
+    /^rgba\(\s*(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?|\d+(?:\.\d+)?%)\s*\)$/,
+  );
+  if (!parsed) {
+    return null;
+  }
+
+  const alpha = parseAlpha(parsed[4]);
+  if (alpha === null || alpha >= 1) {
+    return null;
+  }
+
+  return {
+    rgbHex: `#${toHex(clampColorComponent(Number(parsed[1])))}${toHex(clampColorComponent(Number(parsed[2])))}${toHex(clampColorComponent(Number(parsed[3])))}`,
+    alpha,
+  };
+}
+
+function parseColorWithAlpha(value: string): ParsedHexAlpha | null {
+  return parseHexWithAlpha(value) || parseRgbaWithAlpha(value);
+}
+
 /**
  * Converts alpha hex colors to RGB + explicit opacity attributes.
  *
@@ -113,7 +290,7 @@ function parseHexWithAlpha(value: string): ParsedHexAlpha | null {
  * these to maximize compatibility when inserting shapes.
  */
 export function normalizeAlphaHexColors(svg: SVGElement) {
-  const colorToOpacityAttr: Record<string, string> = {
+  const colorToOpacityAttr: ColorOpacityAttributes = {
     "fill": "fill-opacity",
     "stroke": "stroke-opacity",
     "stop-color": "stop-opacity",
@@ -122,22 +299,65 @@ export function normalizeAlphaHexColors(svg: SVGElement) {
   const elements: Element[] = [svg, ...Array.from(svg.querySelectorAll("*"))];
   elements.forEach((el) => {
     Object.entries(colorToOpacityAttr).forEach(([colorAttr, opacityAttr]) => {
-      const value = el.getAttribute(colorAttr);
-      if (!value) {
-        return;
-      }
-
-      const parsed = parseHexWithAlpha(value);
-      if (!parsed) {
-        return;
-      }
-
-      el.setAttribute(colorAttr, parsed.rgbHex);
-
-      const existingOpacity = parseFloat(el.getAttribute(opacityAttr) || "1");
-      const safeOpacity = Number.isFinite(existingOpacity) ? existingOpacity : 1;
-      const combinedOpacity = Math.max(0, Math.min(1, safeOpacity * parsed.alpha));
-      el.setAttribute(opacityAttr, combinedOpacity.toString());
+      normalizeAlphaColorAttribute(el, colorAttr, opacityAttr);
     });
+    normalizeAlphaColorStyles(el, colorToOpacityAttr);
   });
+}
+
+function normalizeAlphaColorAttribute(el: Element, colorAttr: string, opacityAttr: string) {
+  const value = el.getAttribute(colorAttr);
+  if (!value) {
+    return;
+  }
+
+  const parsed = parseColorWithAlpha(value);
+  if (!parsed) {
+    return;
+  }
+
+  el.setAttribute(colorAttr, parsed.rgbHex);
+  const combinedOpacity = combineOpacity(el.getAttribute(opacityAttr), parsed.alpha);
+  el.setAttribute(opacityAttr, combinedOpacity.toString());
+}
+
+function normalizeAlphaColorStyles(el: Element, colorToOpacityAttr: ColorOpacityAttributes) {
+  const inlineStyle = el.getAttribute("style");
+  if (!inlineStyle) {
+    return;
+  }
+
+  const style = document.createElement("span").style;
+  style.cssText = inlineStyle;
+  const before = style.cssText;
+
+  Object.entries(colorToOpacityAttr).forEach(([colorProperty, opacityProperty]) => {
+    const value = style.getPropertyValue(colorProperty);
+    if (!value) {
+      return;
+    }
+
+    const parsed = parseColorWithAlpha(value);
+    if (!parsed) {
+      return;
+    }
+
+    style.setProperty(colorProperty, parsed.rgbHex, style.getPropertyPriority(colorProperty));
+    const combinedOpacity = combineOpacity(style.getPropertyValue(opacityProperty), parsed.alpha);
+    style.setProperty(opacityProperty, combinedOpacity.toString(), style.getPropertyPriority(opacityProperty));
+  });
+
+  if (style.cssText !== before) {
+    el.setAttribute("style", style.cssText);
+  }
+}
+
+function combineOpacity(opacity: string | null, alpha: number): number {
+  const raw = (opacity || "1").trim();
+  const isPercent = raw.endsWith("%");
+  const parsed = parseFloat(isPercent ? raw.slice(0, -1) : raw);
+  const existingOpacity = Number.isFinite(parsed)
+    ? (isPercent ? parsed / 100 : parsed)
+    : 1;
+  return Math.max(0, Math.min(1, existingOpacity * alpha));
 }

@@ -1,18 +1,12 @@
 import type { Page } from "@playwright/test";
 import path from "node:path";
 import { compileBrowserMock } from "./transpile-browser-mock";
+import type { TypstMockState } from "./browser-mocks/typst";
 
-export type TypstMockCalls = {
-  addSourceCalls: { path: string; source: string }[];
-  compileCalls: { mainFilePath: string }[];
-  renderSvgCalls: {
-    format: string;
-    artifactContent: number[];
-    data_selection: Record<string, boolean>;
-  }[];
-};
-
-const stateModuleUrl = "/pptypst/__test__/typst-state.js";
+export type TypstMockCalls = Pick<
+  TypstMockState,
+  "addSourceCalls" | "compileCalls" | "renderSvgCalls"
+>;
 
 function browserMockPath(fileName: string) {
   return path.join(process.cwd(), "tests", "_support", "browser-mocks", fileName);
@@ -28,7 +22,6 @@ export class TypstMock {
 
   /** Routes only the Typst modules that web/src/typst.ts and font-cache.ts import. */
   async install() {
-    await this.routeModule("**/__test__/typst-state.js", "typst-state.ts");
     await this.routeModule("**/@myriaddreamin_typst__ts.js*", "typst.ts");
     await this.routeModule("**/@myriaddreamin_typst__ts_dist_esm_options__init__mjs.js*", "typst-options.ts");
     await this.routeModule("**/@myriaddreamin_typst__ts_dist_esm_fs_package__node__mjs.js*", "typst-package-registry.ts");
@@ -37,24 +30,34 @@ export class TypstMock {
     await this.routeModule("**/typst_ts_renderer_bg.wasm?*", "typst-wasm-url.ts");
   }
 
-  /** Waits for the mocked renderer init call, which means the Typst wrapper initialized. */
+  /** Resolves once the app has initialized the mocked renderer. */
   async waitUntilReady() {
-    await this.page.waitForFunction(async (moduleUrl) => {
-      const stateModule = await import(moduleUrl) as {
-        typstMockReady: () => boolean;
-      };
-      return stateModule.typstMockReady();
-    }, stateModuleUrl);
+    await this.page.waitForFunction(
+      () => window.__typstMock?.rendererInitOptions.length === 1,
+    );
   }
 
-  /** Returns the Typst compiler and renderer calls recorded in the browser. */
+  /** Snapshot of the compiler/renderer calls recorded so far. */
   async calls(): Promise<TypstMockCalls> {
-    return this.page.evaluate(async (moduleUrl) => {
-      const stateModule = await import(moduleUrl) as {
-        typstMockCalls: () => TypstMockCalls;
-      };
-      return stateModule.typstMockCalls();
-    }, stateModuleUrl);
+    return this.page.evaluate(() => {
+      const state = window.__typstMock;
+      if (!state) {
+        throw new Error("Typst mock has not been initialized yet.");
+      }
+      const { addSourceCalls, compileCalls, renderSvgCalls } = state;
+      return { addSourceCalls, compileCalls, renderSvgCalls };
+    });
+  }
+
+  /** Overrides the SVG the mocked renderer returns for subsequent preview renders. */
+  async setPreviewSvg(svg: string) {
+    await this.page.evaluate((value) => {
+      const state = window.__typstMock;
+      if (!state) {
+        throw new Error("Typst mock has not been initialized yet.");
+      }
+      state.previewSvg = value;
+    }, svg);
   }
 
   private async routeModule(url: string, fileName: string) {

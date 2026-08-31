@@ -1,4 +1,45 @@
-import { typstMockState } from "/pptypst/__test__/typst-state.js";
+/**
+ * Browser mock for `@myriaddreamin/typst.ts`.
+ *
+ * `TypstMock` (see ../typst-mock.ts) serves this in place of the real
+ * WASM-backed library. Recorded compiler/renderer calls and the SVG the
+ * renderer returns live on `window.__typstMock` so the Node-side helper can
+ * read and tweak them via `page.evaluate`.
+ */
+
+export type TypstMockState = {
+  rendererInitOptions: { hasGetModule: boolean }[];
+  addSourceCalls: { path: string; source: string }[];
+  compileCalls: { mainFilePath: string }[];
+  renderSvgCalls: {
+    format: string;
+    artifactContent: number[];
+    data_selection: Record<string, boolean>;
+  }[];
+  previewSvg: string;
+};
+
+declare global {
+  interface Window {
+    __typstMock?: TypstMockState;
+  }
+}
+
+const DEFAULT_PREVIEW_SVG = [
+  '<svg xmlns="http://www.w3.org/2000/svg" width="160" height="40">',
+  '<text x="0" y="20" fill="#000">integral preview</text>',
+  "</svg>",
+].join("");
+
+const state: TypstMockState = {
+  rendererInitOptions: [],
+  addSourceCalls: [],
+  compileCalls: [],
+  renderSvgCalls: [],
+  previewSvg: DEFAULT_PREVIEW_SVG,
+};
+
+window.__typstMock = state;
 
 type CompilerInitOptions = { beforeBuild: unknown[]; getModule: unknown };
 type CompileOptions = { mainFilePath: string };
@@ -7,12 +48,6 @@ type RenderSvgOptions = {
   artifactContent: Uint8Array;
   data_selection: Record<string, boolean>;
 };
-
-const previewSvg = [
-  '<svg xmlns="http://www.w3.org/2000/svg" width="160" height="40">',
-  '<text x="0" y="20" fill="#000">integral preview</text>',
-  "</svg>",
-].join("");
 
 export function createTypstCompiler() {
   return {
@@ -25,10 +60,10 @@ export function createTypstCompiler() {
       return Promise.resolve();
     },
     addSource(path: string, source: string) {
-      typstMockState.addSourceCalls.push({ path, source });
+      state.addSourceCalls.push({ path, source });
     },
     compile(options: CompileOptions) {
-      typstMockState.compileCalls.push(options);
+      state.compileCalls.push(options);
       return Promise.resolve({ diagnostics: [], result: new Uint8Array([1, 2, 3]) });
     },
   };
@@ -37,16 +72,16 @@ export function createTypstCompiler() {
 export function createTypstRenderer() {
   return {
     init(options: { getModule: unknown }) {
-      typstMockState.rendererInitOptions.push({ hasGetModule: typeof options.getModule === "function" });
+      state.rendererInitOptions.push({ hasGetModule: typeof options.getModule === "function" });
       return Promise.resolve();
     },
     renderSvg(options: RenderSvgOptions) {
-      typstMockState.renderSvgCalls.push({
+      state.renderSvgCalls.push({
         format: options.format,
         artifactContent: Array.from(options.artifactContent),
         data_selection: options.data_selection,
       });
-      return Promise.resolve(previewSvg);
+      return Promise.resolve(state.previewSvg);
     },
   };
 }
