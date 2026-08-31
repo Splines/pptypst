@@ -74,11 +74,12 @@ export function applyFillColor(svg: SVGElement, fillColor: string) {
 export function serializeSvgForClipboard(svg: SVGElement, invertColors = false): string {
   const clipboardSvg = svg.cloneNode(true) as SVGElement;
   removePreviewLayoutStyles(clipboardSvg);
-  normalizeAlphaHexColors(clipboardSvg);
 
   if (invertColors) {
     invertSvgColors(clipboardSvg);
   }
+
+  normalizeAlphaHexColors(clipboardSvg);
 
   return new XMLSerializer().serializeToString(clipboardSvg);
 }
@@ -102,27 +103,20 @@ function removePreviewLayoutStyles(svg: SVGElement) {
   }
 }
 
+const SVG_COLOR_KEYS = [
+  "color",
+  "fill",
+  "stroke",
+  "stop-color",
+  "flood-color",
+  "lighting-color",
+];
+
 function invertSvgColors(svg: SVGElement) {
-  const colorAttributes = [
-    "color",
-    "fill",
-    "stroke",
-    "stop-color",
-    "flood-color",
-    "lighting-color",
-  ];
-  const colorProperties = [
-    "color",
-    "fill",
-    "stroke",
-    "stop-color",
-    "flood-color",
-    "lighting-color",
-  ];
   const elements: Element[] = [svg, ...Array.from(svg.querySelectorAll("*"))];
 
   elements.forEach((el) => {
-    colorAttributes.forEach((attribute) => {
+    SVG_COLOR_KEYS.forEach((attribute) => {
       const color = el.getAttribute(attribute);
       const invertedColor = color ? invertCssColor(color) : null;
       if (invertedColor) {
@@ -137,19 +131,34 @@ function invertSvgColors(svg: SVGElement) {
 
     const style = document.createElement("span").style;
     style.cssText = inlineStyle;
-    colorProperties.forEach((property) => {
+    const before = style.cssText;
+    SVG_COLOR_KEYS.forEach((property) => {
       const color = style.getPropertyValue(property);
       const invertedColor = color ? invertCssColor(color) : null;
       if (invertedColor) {
         style.setProperty(property, invertedColor, style.getPropertyPriority(property));
       }
     });
-    el.setAttribute("style", style.cssText);
+    if (style.cssText !== before) {
+      el.setAttribute("style", style.cssText);
+    }
   });
 }
 
+const invertedColorCache = new Map<string, string | null>();
+
 function invertCssColor(color: string): string | null {
   const value = color.trim();
+  const cached = invertedColorCache.get(value);
+  if (cached !== undefined) {
+    return cached;
+  }
+  const inverted = computeInvertedCssColor(value);
+  invertedColorCache.set(value, inverted);
+  return inverted;
+}
+
+function computeInvertedCssColor(value: string): string | null {
   const normalizedValue = value.toLowerCase();
   if (!value || normalizedValue === "none" || normalizedValue.startsWith("url(")) {
     return null;
@@ -320,6 +329,7 @@ function normalizeAlphaColorStyles(el: Element, colorToOpacityAttr: ColorOpacity
 
   const style = document.createElement("span").style;
   style.cssText = inlineStyle;
+  const before = style.cssText;
 
   Object.entries(colorToOpacityAttr).forEach(([colorProperty, opacityProperty]) => {
     const value = style.getPropertyValue(colorProperty);
@@ -337,7 +347,9 @@ function normalizeAlphaColorStyles(el: Element, colorToOpacityAttr: ColorOpacity
     style.setProperty(opacityProperty, combinedOpacity.toString(), style.getPropertyPriority(opacityProperty));
   });
 
-  el.setAttribute("style", style.cssText);
+  if (style.cssText !== before) {
+    el.setAttribute("style", style.cssText);
+  }
 }
 
 function combineOpacity(opacity: string | null, alpha: number): number {
