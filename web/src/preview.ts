@@ -155,6 +155,11 @@ export async function updatePreview() {
 
   const result = await typst({ body: rawCode, preamble }, fontSize, mathMode);
 
+  // A newer keystroke might have arrived while Typst was compiling
+  if (getTypstCode().trim() !== rawCode) {
+    return;
+  }
+
   if (result.diagnostics && result.diagnostics.length > 0) {
     diagnosticsContainer.style.display = "block";
     displayDiagnostics(result.diagnostics, diagnosticsContent);
