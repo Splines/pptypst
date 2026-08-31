@@ -379,3 +379,132 @@ button {
         color: #64b5f6;
     }
 }
+/* Custom fonts panel */
+.fonts-panel {
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--bg-secondary);
+    overflow: hidden;
+}
+
+.fonts-summary {
+    padding: 8px 10px;
+    cursor: pointer;
+    list-style: none;
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 600;
+    user-select: none;
+
+    &::-webkit-details-marker {
+        display: none;
+    }
+}
+
+.fonts-summary:hover {
+    background: color-mix(in srgb, var(--bg-secondary) 88%, var(--text-primary) 12%);
+}
+
+.fonts-upload {
+    display: block;
+    margin: 0 10px 8px;
+    padding: 8px;
+    border: 1px dashed var(--border-color);
+    border-radius: 4px;
+    text-align: center;
+    cursor: pointer;
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.fonts-upload:hover {
+    background: color-mix(in srgb, var(--bg-secondary) 88%, var(--text-primary) 12%);
+}
+
+.fonts-input {
+    display: none;
+}
+
+.fonts-list {
+    list-style: none;
+    margin: 0 10px 10px;
+    padding: 0;
+}
+
+.fonts-empty {
+    color: var(--text-secondary);
+    font-size: 12px;
+    padding: 2px 0;
+}
+
+.fonts-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 6px 8px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    margin-bottom: 6px;
+    background: var(--bg-tertiary);
+}
+
+.fonts-item-info {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.fonts-item-family-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+}
+
+.fonts-item-family {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.fonts-item-style {
+    flex: 0 0 auto;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 1px 5px;
+    border-radius: 3px;
+    background: color-mix(in srgb, var(--button-bg) 18%, transparent);
+    color: var(--button-bg);
+}
+
+.fonts-item-file {
+    font-size: 11px;
+    color: var(--text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.fonts-item-remove {
+    flex: 0 0 auto;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border: none;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 13px;
+    line-height: 1;
+}
+
+.fonts-item-remove:hover {
+    background: var(--error-color);
+    color: #fff;
+}

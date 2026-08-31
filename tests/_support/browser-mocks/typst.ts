@@ -66,6 +66,26 @@ export function createTypstCompiler() {
       state.compileCalls.push(options);
       return Promise.resolve({ diagnostics: [], result: new Uint8Array([1, 2, 3]) });
     },
+    setFonts() {
+      // no-op in tests
+    },
+  };
+}
+
+export function createTypstFontBuilder() {
+  return {
+    init() {
+      return Promise.resolve();
+    },
+    getFontInfo() {
+      return Promise.resolve({});
+    },
+    addFontData() {
+      return Promise.resolve();
+    },
+    build<T>(cb: (_resolver: unknown) => Promise<T>) {
+      return cb({});
+    },
   };
 }
 

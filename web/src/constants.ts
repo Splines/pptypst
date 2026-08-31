@@ -62,6 +62,9 @@ export const DOM_IDS = {
   ABOUT_LINK: "aboutLink",
   ABOUT_MODAL: "aboutModal",
   ABOUT_MODAL_CLOSE: "aboutModalClose",
+  FONTS_DETAILS: "fontsDetails",
+  FONTS_INPUT: "fontsInput",
+  FONTS_LIST: "fontsList",
 } as const;
 
 /**
@@ -74,6 +77,7 @@ export const STORAGE_KEYS = {
   MATH_MODE: "typstMathMode",
   PREAMBLE: "typstPreamble",
   PREAMBLE_OPEN: "typstPreambleOpen",
+  FONTS_OPEN: "typstFontsOpen",
   THEME: "typstTheme",
 } as const;
 

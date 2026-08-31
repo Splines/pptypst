@@ -106,6 +106,17 @@
       ></textarea>
     </details>
 
+    <details id="fontsDetails" class="fonts-panel">
+      <summary class="fonts-summary" title="Upload font files to use them in your Typst code via #set text(font: ...)">
+        Custom fonts
+      </summary>
+      <label class="fonts-upload">
+        <span class="fonts-upload-text">＋ Add font file</span>
+        <input id="fontsInput" type="file" class="fonts-input" accept=".ttf,.otf,.ttc" multiple>
+      </label>
+      <ul id="fontsList" class="fonts-list"></ul>
+    </details>
+
     <!-- Status Bar -->
     <div id="statusBar" class="status-bar">
       <div id="status" class="status-text"></div>

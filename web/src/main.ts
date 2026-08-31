@@ -4,6 +4,8 @@ import { setupPreviewListeners, updateButtonState } from "./preview.js";
 import { initializeDarkMode, setupDarkModeToggle } from "./theme.js";
 import { handleSelectionChange } from "./selection.js";
 import { generateFromFile, initializeDropzone } from "./file/file.js";
+import { loadStoredFonts } from "./registry/user-fonts.js";
+import { setupFontsPanel } from "./font-ui.js";
 import { DOM_IDS } from "./constants.js";
 import { getHTMLElement } from "./utils/dom.js";
 
@@ -51,6 +53,9 @@ await Office.onReady(async (info) => {
     return;
   }
 
+  // Load persisted custom fonts before the compiler is initialized so they are
+  // available for the very first preview.
+  await loadStoredFonts();
   await initTypst();
 
   initializeDarkMode();
@@ -61,6 +66,7 @@ await Office.onReady(async (info) => {
   initializeDropzone();
   setupEventListeners();
   setupPreviewListeners();
+  setupFontsPanel();
   updateButtonState();
 
   Office.context.document.addHandlerAsync(

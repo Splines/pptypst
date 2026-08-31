@@ -5,14 +5,13 @@
  * https://github.com/Myriad-Dreamin/typst.ts/blob/2a8b32d8cca70cc4d105fef074d2f35fc7546450/templates/compiler-wasm-cjs/src/cached-font-middleware.cts#L1-L52
  */
 
-import { preloadFontAssets } from "@myriaddreamin/typst.ts/dist/esm/options.init.mjs";
-
 const FONT_CACHE_NAME = "typst-font-assets-v1";
 
 /**
- * A fetch wrapper that caches font assets in the browser's Cache API.
+ * A fetch wrapper that caches font assets in the browser's Cache API, so the
+ * (large) default font assets are downloaded at most once per browser.
  */
-async function cachedFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+export async function cachedFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
   const request = input instanceof Request ? input : new Request(input, init);
 
   if (!("caches" in globalThis) || request.method.toUpperCase() !== "GET") {
@@ -43,15 +42,4 @@ async function cachedFetch(input: RequestInfo | URL, init?: RequestInit): Promis
   }
 
   return response;
-}
-
-export function cachedFontInitOptions() {
-  return {
-    beforeBuild: [
-      preloadFontAssets({
-        assets: ["text", "cjk", "emoji"],
-        fetcher: cachedFetch,
-      }),
-    ],
-  };
 }
