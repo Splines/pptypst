@@ -18,6 +18,10 @@ export default defineConfig([
             "node_modules/",
             "web/pkg/",
             "tmp/",
+            // Self-contained nested package: it has its own eslint config,
+            // tsconfig and `npm run lint`. Linting it from here runs it through
+            // the wrong tsconfig (type-checked rules then error on every file).
+            "cavalry/",
         ],
     },
     {

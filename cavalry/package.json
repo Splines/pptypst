@@ -7,7 +7,7 @@
   "scripts": {
     "assets": "node scripts/fetch-assets.mjs",
     "build": "vite build",
-    "pack": "node scripts/pack-plugin.mjs",
+    "pack": "node scripts/pack.mjs",
     "test": "node --test",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
     "lint": "eslint --config .config/eslint.mjs src test scripts vite.config.ts",

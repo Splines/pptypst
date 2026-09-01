@@ -88,9 +88,8 @@ export default defineConfig([
     },
   },
   {
-    // Build tooling and the plug-in's own install script: plain Node/Cavalry
-    // JS, no type-checked linting.
-    files: ["scripts/**/*.mjs", "plugin/**/*.js"],
+    // Build tooling: plain Node ESM, no type-checked linting.
+    files: ["scripts/**/*.mjs"],
     extends: [tseslint.configs.disableTypeChecked],
     languageOptions: {
       ecmaVersion: 2022,

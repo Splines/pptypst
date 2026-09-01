@@ -1,8 +1,7 @@
 # PPTypst for Cavalry
 
 Brings PPTypst's "type Typst → get vector paths" workflow into the
-[Cavalry](https://cavalry.studio) animation app, installed by dragging one zip
-onto the Cavalry window.
+[Cavalry](https://cavalry.studio) animation app as a Script UI window.
 
 A small window with a Typst editor, a live preview that re-renders as you type,
 and one action button. **Insert** compiles the Typst to SVG and imports it as
@@ -22,43 +21,46 @@ npm run setup       # assets + build + pack, in one go
 
 `npm run setup` runs three steps (also available individually):
 
-| step            | output                                                              |
-| --------------- | ------------------------------------------------------------------ |
-| `npm run assets` | `assets/vendor/` — the two wasm modules + 12 fonts (~35 MB)        |
-| `npm run build`  | `dist/pptypst-cavalry.js` — the window script, one minified IIFE   |
-| `npm run pack`   | `dist/PPTypst/` and `dist/PPTypst.zip` — the installable plug-in   |
+| step             | output                                                             |
+| ---------------- | ---------------------------------------------------------------- |
+| `npm run assets` | `assets/vendor/` — the two wasm modules + 12 fonts (~35 MB)      |
+| `npm run build`  | `dist/pptypst-cavalry.js` — the window script (Vite, minified IIFE) |
+| `npm run pack`   | `dist/PPTypst.tar.gz` — that script + the assets, ready to install |
 
 ## Install
 
-The wasm modules and fonts are far too large to embed in the script, so the
-plug-in carries them and drops everything into place on install:
+The wasm modules and fonts are far too large to embed in the script, so it reads
+them from a `pptypst_assets/` folder sitting next to it. `dist/PPTypst.tar.gz`
+holds both, at the archive root:
 
-1. Drag **`dist/PPTypst.zip`** (or the `dist/PPTypst/` folder) onto an open
-   Cavalry window and confirm the dialog.
-2. The plug-in copies `PPTypst.js` and `pptypst_assets/vendor/` into your
-   Cavalry **Scripts** folder ([`plugin/welcome.js`](plugin/welcome.js)), then
-   shows a splash.
+```
+PPTypst.js
+pptypst_assets/vendor/   (wasm + fonts)
+```
+
+1. In Cavalry: **Scripts ▸ Show Scripts Folder** (or go there directly):
+   - macOS — `~/Library/Application Support/Cavalry/Scripts`
+   - Windows — `%APPDATA%/Cavalry/Scripts`
+2. Unpack `dist/PPTypst.tar.gz` into that folder, so it now holds `PPTypst.js`
+   next to `pptypst_assets/`. (`tar -xzf PPTypst.tar.gz -C "<Scripts folder>"`,
+   or extract with any archive tool.)
 3. Open **Window ▸ Scripts ▸ PPTypst**, type some Typst, and click **Insert**.
 
-Cavalry only accepts a plug-in that registers at least one layer, so the plug-in
-adds one inert **PPTypst** utility node ([`plugin/`](plugin/)): it outputs
-nothing useful and exists only so the plug-in is valid and so **Add ▸ PPTypst**
-can double as a launch point — creating it runs the window script
-([`plugin/setup.js`](plugin/setup.js)). Re-dragging the zip updates the files in
-place.
+The `pptypst_assets` folder is hidden from the Scripts menu by its `_assets`
+suffix. To update, unpack a fresh archive over the old files.
 
 ### JavaScript-Editor dev loop
 
 `ui.scriptLocation` is blank when a script is pasted rather than run from the
-Scripts menu, so the asset directory has to be baked in:
+Scripts menu, so for editor testing the asset directory has to be baked in:
 
 ```bash
 PPTYPST_ASSET_DIR="C:/Users/<you>/AppData/Roaming/Cavalry/Scripts/pptypst_assets/vendor" npm run build
 ```
 
-Then paste `dist/pptypst-cavalry.js` into the JavaScript Editor. A normal
-`npm run build` leaves the path empty, which is what the shipped plug-in wants:
-the script then falls back to `<script folder>/pptypst_assets/vendor`.
+Then paste `dist/pptypst-cavalry.js` into the JavaScript Editor. A plain
+`npm run build` leaves the path empty, so the packaged script falls back to
+`<script folder>/pptypst_assets/vendor`.
 
 ## Architecture
 
@@ -135,8 +137,7 @@ inside Cavalry before it ships.
 ## Known limitations
 
 - The script is not self-contained; it reads `pptypst_assets/vendor/` from next
-  to itself at runtime. The plug-in puts it there on install; the drag-install
-  step (`plugin/welcome.js`) is unverified against a live Cavalry build.
+  to itself at runtime, so it must be installed as a folder (not pasted).
 - Typst package imports (`#import "@preview/…"`) are unsupported (no registry).
 - Updating a formula deletes and recreates it. The new group is re-centred on
   the old one's centre, but its rotation and scale are not carried over.

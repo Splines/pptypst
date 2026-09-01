@@ -1,9 +1,9 @@
 /**
  * Bundles `src/main.ts` into a single-file IIFE: `dist/pptypst-cavalry.js`.
  *
- * That file is pasted into Cavalry's JavaScript Editor, or shipped inside the
- * plug-in folder assembled by `scripts/pack-plugin.mjs` and copied into the
- * Scripts folder on install.
+ * That file is pasted into Cavalry's JavaScript Editor, or shipped as
+ * `PPTypst.js` inside the `PPTypst.tar.gz` that `scripts/pack.mjs` builds and
+ * the user unpacks into their Cavalry Scripts folder.
  *
  *   npm run build                          -> production bundle, no asset override
  *   PPTYPST_ASSET_DIR=/abs/vendor npm run build
