@@ -14,6 +14,8 @@ const EXAMPLE_SOURCE = "$ integral_0^1 x^2 dif x = 1/3 $";
 /** Actions the panel reports; implemented by the composition root. */
 export interface PanelHandlers {
   onInsert: () => void;
+  /** Re-render the current formula as one vector layer per glyph. */
+  onBreakApart: () => void;
   /**
    * The scene selection changed. The panel does not know what is selected —
    * the app inspects the scene and calls back with {@link Panel.setEditing}.
@@ -39,6 +41,8 @@ export interface Panel {
    * and replacing the one currently selected in the scene ("Update").
    */
   setEditing: (editing: boolean) => void;
+  /** Break Apart only makes sense once there is something to break apart. */
+  setCanBreakApart: (can: boolean) => void;
   /** Repaints the live preview from raw typst.ts SVG. */
   showPreview: (svg: string) => void;
   /** Clears the live preview. */
@@ -50,6 +54,9 @@ const MIN_FONT_SIZE_PT = 1;
 
 export function createPanel(handlers: PanelHandlers): Panel {
   ui.setTitle("PPTypst");
+
+  /** Latched separately from `setBusy`, so the two can't fight over the button. */
+  let canBreakApart = false;
 
   const editor = new ui.MultiLineEdit();
   editor.setPlaceholder(`Typst source, e.g.  ${EXAMPLE_SOURCE}`);
@@ -65,10 +72,20 @@ export function createPanel(handlers: PanelHandlers): Panel {
   fontSizeField.setStep(1);
 
   const insertButton = new ui.Button("Insert");
+  const breakApartButton = new ui.Button("Break Apart");
+  breakApartButton.setToolTip(
+    "Import the formula as one editable vector layer per glyph, for staggering "
+    + "or colouring them individually. The result is plain geometry: it keeps no "
+    + "Typst source and cannot be updated.",
+  );
+  breakApartButton.setEnabled(false);
   const status = new ui.Label("Ready.");
 
   insertButton.onClick = () => {
     handlers.onInsert();
+  };
+  breakApartButton.onClick = () => {
+    handlers.onBreakApart();
   };
   editor.onValueChanged = () => {
     handlers.onSourceChanged();
@@ -91,8 +108,11 @@ export function createPanel(handlers: PanelHandlers): Panel {
 
   ui.add(editor);
   ui.add(preview.widget);
+  const actionRow = new ui.HLayout();
+  actionRow.add(insertButton, breakApartButton);
+
   ui.add(fontSizeRow);
-  ui.add(insertButton);
+  ui.add(actionRow);
   ui.add(status);
   ui.addStretch();
   ui.setMinimumWidth(360);
@@ -122,9 +142,14 @@ export function createPanel(handlers: PanelHandlers): Panel {
     },
     setBusy: (busy: boolean) => {
       insertButton.setEnabled(!busy);
+      breakApartButton.setEnabled(!busy && canBreakApart);
     },
     setEditing: (editing: boolean) => {
       insertButton.setText(editing ? "Update" : "Insert");
+    },
+    setCanBreakApart: (can: boolean) => {
+      canBreakApart = can;
+      breakApartButton.setEnabled(can);
     },
     showPreview: preview.show,
     clearPreview: preview.clear,

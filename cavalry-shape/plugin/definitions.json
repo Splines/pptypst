@@ -1,0 +1,47 @@
+[
+    {
+        "author": "pptypst",
+        "type": "pptypstFormula",
+        "superType": "thirdPartyJavaScriptShape",
+        "jsFile": "formula.js",
+        "version": "1.0",
+        "attributes": {
+            "typstSource": {
+                "type": "string",
+                "default": ""
+            },
+            "typstFontSize": {
+                "type": "double",
+                "default": 150.0,
+                "min": 1.0,
+                "softMax": 600.0,
+                "step": 1.0,
+                "prefix": "pt"
+            },
+            "typstColours": {
+                "type": "bool",
+                "default": false
+            },
+            "typstGeometry": {
+                "type": "string",
+                "default": ""
+            },
+            "material": {
+                "defaultSubnodeType": "colorMaterial"
+            }
+        },
+        "triggers": {
+            "polyMesh": [
+                "typstGeometry",
+                "typstColours"
+            ]
+        },
+        "UI": {
+            "attributeOrder": [
+                "typstSource",
+                "typstFontSize",
+                "typstColours"
+            ]
+        }
+    }
+]

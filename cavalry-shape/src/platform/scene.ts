@@ -1,28 +1,23 @@
 /**
- * Cavalry scene adapter: turning a rendered SVG into a named, tagged group of
- * vector layers, and finding such a group again from the current selection.
+ * Cavalry scene helpers that are not about the formula layer itself:
+ * reading the composition, moving layers around, and the "Break Apart" import
+ * that turns a rendered formula into one editable vector layer per glyph.
  *
- * All `api.*` scene access lives here.
+ * Break Apart is the old (pre-plug-in) insert path, kept because it is the one
+ * thing a single shape layer cannot do: give each glyph its own layer, so
+ * glyphs can be staggered, coloured or animated independently. It is a one-way
+ * trip — the result is plain Cavalry geometry with no Typst source attached.
  */
 
 import { flattenSvg } from "../core/svg-flatten.ts";
-import {
-  formulaLayerName,
-  parseFormula,
-  serializeFormula,
-  type Formula,
-} from "../core/formula.ts";
-import { LAYER_NAME, SHAPE_LAYER_NAME, USER_DATA_KEY } from "../config.ts";
+import { SHAPE_LAYER_NAME } from "../config.ts";
 import { writeTempFile } from "./files.ts";
 
-/** A formula found in the scene, together with the group carrying it. */
-export interface SceneFormula {
-  layerId: string;
-  formula: Formula;
+/** A point in scene space. */
+export interface Point {
+  x: number;
+  y: number;
 }
-
-/** How far up the hierarchy `findSelectedFormula` looks for a tagged group. */
-const MAX_ANCESTOR_DEPTH = 32;
 
 /**
  * The active composition's vertical resolution in pixels, or `0` if there is
@@ -38,16 +33,27 @@ export function getActiveCompHeightPx(): number {
   return typeof height === "number" ? height : 0;
 }
 
+/** World-space centre of a layer's bounding box. */
+export function centreOf(layerId: string): Point {
+  return api.getBoundingBox(layerId, true).centre;
+}
+
+/** Shifts `layerId` so its bounding box centre lands on `target`. */
+export function centreOn(layerId: string, target: Point): void {
+  const current = centreOf(layerId);
+  api.select([layerId]);
+  api.move(target.x - current.x, target.y - current.y);
+}
+
 /**
  * Imports `svg` and returns the id of the single group holding the result.
  *
  * `api.convertSVGToLayers` returns the wrapping group it makes *and* all of its
- * descendants. When there is exactly one such root it is reused as the formula
- * group (renamed in place), so the result is one folder -- not `name` wrapped
- * around Cavalry's own "SVG Layer N". The vector layers inside are then renamed
- * and flipped by {@link tidyShapeLayers}.
+ * descendants. When there is exactly one such root it is reused as the group
+ * (renamed in place), so the result is one folder — not `name` wrapped around
+ * Cavalry's own "SVG Layer N".
  */
-function importSvgAsGroup(svg: string, name: string): string {
+export function importSvgAsGroup(svg: string, name: string): string {
   // typst.ts's SVG needs flattening first; Cavalry's importer cannot resolve
   // its <use>/<defs> glyph references. See core/svg-flatten.ts.
   const svgPath = writeTempFile("svg", flattenSvg(svg));
@@ -98,68 +104,4 @@ function tidyShapeLayers(groupId: string): void {
   for (let i = 1; i < paintOrder.length; i++) {
     api.reorder(paintOrder[i], paintOrder[i - 1]);
   }
-}
-
-/**
- * Inserts `formula` into the scene as vector layers rendered from `svg`, tags
- * the resulting group with the formula source, selects it and returns its id.
- *
- * When `replaceLayerId` refers to a layer that still exists it is deleted, so
- * editing a formula replaces it rather than stacking a copy on top, and the new
- * group is nudged so its centre lands on the old one's centre (mirrors the
- * PowerPoint add-in's `calculateCenteredPosition`). Rotation and scale are not
- * carried over.
- */
-export function insertFormula(formula: Formula, svg: string, replaceLayerId?: string): string {
-  const name = formulaLayerName(formula.source, LAYER_NAME);
-
-  const toReplace = replaceLayerId !== undefined && api.layerExists(replaceLayerId)
-    ? replaceLayerId
-    : null;
-  // Capture the old formula's centre and expand/collapse state before it is
-  // deleted. A fresh insert starts collapsed (its glyph paths are Scene-window
-  // noise); an update keeps whatever state the user had the old group in.
-  const oldCentre = toReplace
-    ? api.getBoundingBox(toReplace, true).centre
-    : null;
-  const expanded = toReplace ? api.get(toReplace, "hierarchy") === true : false;
-
-  const groupId = importSvgAsGroup(svg, name);
-
-  if (toReplace) {
-    api.deleteLayer(toReplace);
-  }
-
-  api.set(groupId, { hierarchy: expanded });
-  api.setUserData(groupId, USER_DATA_KEY, serializeFormula(formula));
-  api.select([groupId]);
-
-  if (oldCentre) {
-    // Both the bounding box and api.move work in scene units; move shifts the
-    // freshly selected group by the delta between the two centres.
-    const newCentre = api.getBoundingBox(groupId, true).centre;
-    api.move(oldCentre.x - newCentre.x, oldCentre.y - newCentre.y);
-  }
-
-  return groupId;
-}
-
-/**
- * Searches the current selection, and each selected layer's ancestors, for a
- * group tagged with a PPTypst formula. Returns the first match.
- */
-export function findSelectedFormula(): SceneFormula | null {
-  for (const selected of api.getSelection()) {
-    let current = selected;
-    for (let depth = 0; depth < MAX_ANCESTOR_DEPTH && current; depth++) {
-      if (api.hasUserDataKey(current, USER_DATA_KEY)) {
-        const formula = parseFormula(api.getUserDataKey(current, USER_DATA_KEY));
-        if (formula) {
-          return { layerId: current, formula };
-        }
-      }
-      current = api.getParent(current);
-    }
-  }
-  return null;
 }

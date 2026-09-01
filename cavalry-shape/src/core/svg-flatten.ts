@@ -303,14 +303,14 @@ function skipToClose(src: string, tagName: string, from: number): number {
   return pos;
 }
 
-interface Style {
+export interface Style {
   fill: string;
   stroke: string;
   strokeWidth: string;
   fillRule: string;
 }
 
-interface FlattenResult {
+export interface FlattenResult {
   width: number;
   height: number;
   paths: { d: string; style: Style }[];

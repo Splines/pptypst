@@ -1,15 +1,12 @@
 /**
- * The formula as PPTypst stores it on a Cavalry layer, and how that layer is
- * named.
+ * What a formula is, and how the layer holding it is named.
  *
- * Everything about the persisted shape lives here so that adding per-formula
- * settings later (font size, colour, ...) is a contained change: bump
- * {@link FORMULA_VERSION}, extend {@link Formula}, and teach
- * {@link parseFormula} how to read the older shapes.
+ * A formula now lives in the plug-in layer's own attributes (see
+ * `platform/layer.ts`), so nothing here writes to a layer any more.
+ * {@link parseFormula} remains to *read* the `api.setUserData` payload that
+ * PPTypst wrote before the plug-in existed, so those scenes can still be opened
+ * and their formulas re-typeset.
  */
-
-/** Version stamped into every payload written to a layer. */
-export const FORMULA_VERSION = 2;
 
 /** What PPTypst knows about an inserted formula. */
 export interface Formula {
@@ -23,25 +20,17 @@ export interface Formula {
   fontSizePt?: number;
 }
 
-/** The on-layer representation. Kept structurally separate from {@link Formula}. */
+/** The pre-plug-in on-layer representation, as `api.getUserDataKey` returns it. */
 interface StoredFormula {
   v: number;
   code: string;
   fontSize?: number;
 }
 
-export function serializeFormula(formula: Formula): unknown {
-  return {
-    v: FORMULA_VERSION,
-    code: formula.source,
-    fontSize: formula.fontSizePt,
-  } satisfies StoredFormula;
-}
-
 /**
- * Reads a payload previously written by {@link serializeFormula}. Returns
- * `null` for anything unrecognisable, so a layer carrying foreign or corrupt
- * user data is simply treated as "not a PPTypst formula".
+ * Reads a pre-plug-in user-data payload. Returns `null` for anything
+ * unrecognisable, so a layer carrying foreign or corrupt user data is simply
+ * treated as "not a PPTypst formula".
  */
 export function parseFormula(raw: unknown): Formula | null {
   if (typeof raw !== "object" || raw === null) {

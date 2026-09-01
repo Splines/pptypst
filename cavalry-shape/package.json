@@ -1,15 +1,18 @@
 {
   "name": "pptypst-cavalry",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "description": "PPTypst integration for the Cavalry animation software.",
   "scripts": {
     "assets": "node scripts/fetch-assets.mjs",
-    "build": "node build.mjs",
+    "build:panel": "vite build --mode panel",
+    "build:shape": "vite build --mode shape",
+    "probe-plugins": "node scripts/make-probe-plugins.mjs",
+    "build": "node scripts/clean.mjs && npm run build:panel && npm run build:shape && node scripts/pack-plugin.mjs",
     "test": "node --test",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
-    "lint": "eslint --config .config/eslint.mjs src test build.mjs scripts",
+    "lint": "eslint --config .config/eslint.mjs src test scripts tools vite.config.ts plugin",
     "check": "npm run typecheck && npm run lint && npm test",
     "setup": "npm run assets && npm run build"
   },
@@ -18,11 +21,11 @@
     "@scenery/cavalry-types": "^1.0.0",
     "@stylistic/eslint-plugin": "^5.7",
     "@types/node": "^26.4",
-    "esbuild": "^0.25",
     "eslint": "^10.2",
     "globals": "^17.5",
     "typescript": "^6.0",
-    "typescript-eslint": "^8.69"
+    "typescript-eslint": "^8.69",
+    "vite": "^7.1"
   },
   "dependencies": {
     "@myriaddreamin/typst-ts-renderer": "^0.7.0-rc2",

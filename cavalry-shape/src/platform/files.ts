@@ -7,28 +7,46 @@
 
 import type { AssetReader } from "../core/assets.ts";
 import { base64ToBytes } from "../core/base64.ts";
-import { ASSET_DIR_CONVENTION, ASSET_DIR_OVERRIDE, TEMP_SUBDIR } from "../config.ts";
+import { ASSET_DIR_CONVENTION, ASSET_DIR_OVERRIDE, PLUGIN, TEMP_SUBDIR } from "../config.ts";
 
 /**
- * Resolves the asset directory: the configured override if set, otherwise the
- * `<script folder>/pptypst_assets/vendor` convention.
+ * Resolves the asset directory, trying in order:
  *
- * `ui.scriptLocation` is blank when a script is run from the JavaScript Editor
- * rather than the Scripts menu, which is why the override exists.
+ *   1. `ASSET_DIR_OVERRIDE`, for running the panel straight out of the
+ *      JavaScript Editor (where `ui.scriptLocation` is blank);
+ *   2. the installed plug-in's own `assets/vendor`, which is where
+ *      `npm run build` puts them and how a drag-and-drop install lands;
+ *   3. the `pptypst_assets/vendor` convention next to an installed script.
  */
 export function resolveAssetDir(): string {
+  const candidates: string[] = [];
+
   if (ASSET_DIR_OVERRIDE) {
-    return ASSET_DIR_OVERRIDE;
+    candidates.push(ASSET_DIR_OVERRIDE);
   }
+  candidates.push(`${pluginDir()}/${PLUGIN.assetSubdir}`);
+
   // Mis-typed as `void` by @scenery/cavalry-types; it is a string at runtime.
   const scriptLocation = ui.scriptLocation as unknown as string | undefined;
-  if (!scriptLocation) {
-    throw new Error(
-      "Cannot locate the PPTypst assets: this script is not running from the "
-      + "Scripts folder, so set ASSET_DIR_OVERRIDE in src/config.ts.",
-    );
+  if (scriptLocation) {
+    candidates.push(`${scriptLocation}/${ASSET_DIR_CONVENTION}`);
   }
-  return `${scriptLocation}/${ASSET_DIR_CONVENTION}`;
+
+  for (const candidate of candidates) {
+    if (api.isDirectory(candidate)) {
+      return candidate;
+    }
+  }
+
+  throw new Error(
+    "Cannot locate the PPTypst assets. Install the plug-in (see README) or set "
+    + `ASSET_DIR_OVERRIDE in src/config.ts. Looked in: ${candidates.join(", ")}`,
+  );
+}
+
+/** Where a drag-and-drop install puts the plug-in folder. */
+export function pluginDir(): string {
+  return `${api.getAppDataFolder()}/Third-Party/Plugins/${PLUGIN.folder}`;
 }
 
 /** An {@link AssetReader} backed by Cavalry's `api.encodeBinary`. */

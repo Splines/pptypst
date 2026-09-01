@@ -5,6 +5,9 @@
         "lib": [
             "ES2021"
         ],
+        // The script context's globals (api/cavalry/ui). The JS Shape sandbox
+        // has a different, smaller set -- `src/plugin/shape.ts` pulls the extra
+        // `ctx` declarations in itself.
         "types": [
             "@scenery/cavalry-types"
         ],

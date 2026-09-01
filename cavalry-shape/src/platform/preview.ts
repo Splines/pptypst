@@ -8,8 +8,9 @@
  * from `ui.onResize` so the swatch always spans the panel.
  */
 
+import { buildPath } from "../cavalry/mesh.ts";
 import { flattenTypstSvg } from "../core/svg-flatten.ts";
-import { boundingBox, parsePathData, type BoundingBox, type PathVerb } from "../core/svg-path.ts";
+import { boundingBox, parsePathData, type BoundingBox } from "../core/svg-path.ts";
 
 /** Height of the preview strip, in pixels; the width tracks the panel. */
 const HEIGHT = 190;
@@ -85,8 +86,9 @@ export function createPreview(): Preview {
     }
 
     // `ui.Draw`'s path space has its origin at the widget's bottom-left with
-    // +x right and +y up. SVG is top-left origin and y-down, so `feed` flips y;
-    // the origin passed in places the ink box's middle at the widget centre.
+    // +x right and +y up. SVG is top-left origin and y-down, so the transform
+    // negates y; its translation places the ink box's middle at the widget
+    // centre.
     const boxWidth = box.maxX - box.minX;
     const boxHeight = box.maxY - box.minY;
     const scale = Math.min(
@@ -96,9 +98,10 @@ export function createPreview(): Preview {
     const originX = width / 2 - ((box.minX + box.maxX) / 2) * scale;
     const originY = HEIGHT / 2 + ((box.minY + box.maxY) / 2) * scale;
 
+    const transform = { scaleX: scale, scaleY: -scale, translateX: originX, translateY: originY };
+
     for (const { verbs, style } of visible) {
-      const path = new cavalry.Path();
-      feed(path, verbs, scale, originX, originY);
+      const path = buildPath(verbs, transform);
       const asStroke = style.fill === "none";
       draw.addPath(path.toObject(), asStroke ? { color: INK, stroke: true, strokeWidth: 1 } : { color: INK });
     }
@@ -125,35 +128,4 @@ export function createPreview(): Preview {
   }
 
   return { widget: draw, show, clear, setWidth };
-}
-
-/**
- * Replays `verbs` onto `path`, mapping SVG coords (top-left origin, y-down) into
- * `ui.Draw`'s path space (bottom-left origin, y-up): scale to fit, then place
- * relative to `originX` / `originY` -- the pixel position of the SVG's (0, 0)
- * corner -- adding along x and subtracting along y so the drawing stays upright.
- */
-function feed(
-  path: cavalry.Path,
-  verbs: readonly PathVerb[],
-  scale: number,
-  originX: number,
-  originY: number,
-): void {
-  const x = (value: number): number => originX + value * scale;
-  const y = (value: number): number => originY - value * scale;
-
-  for (const { type, coords } of verbs) {
-    if (type === "M") {
-      path.moveTo(x(coords[0]), y(coords[1]));
-    } else if (type === "L") {
-      path.lineTo(x(coords[0]), y(coords[1]));
-    } else if (type === "C") {
-      path.cubicTo(x(coords[0]), y(coords[1]), x(coords[2]), y(coords[3]), x(coords[4]), y(coords[5]));
-    } else if (type === "Q") {
-      path.quadTo(x(coords[0]), y(coords[1]), x(coords[2]), y(coords[3]));
-    } else {
-      path.close();
-    }
-  }
 }

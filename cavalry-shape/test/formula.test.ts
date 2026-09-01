@@ -1,27 +1,18 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import {
-  FORMULA_VERSION,
-  formulaLayerName,
-  parseFormula,
-  serializeFormula,
-} from "../src/core/formula.ts";
+import { formulaLayerName, parseFormula } from "../src/core/formula.ts";
 
 const naming = { maxSourceChars: 20 };
 
-test("round-trips a formula through the stored payload", () => {
-  const formula = { source: "$ integral_0^1 x^2 dif x $", fontSizePt: 42 };
-  assert.deepEqual(parseFormula(serializeFormula(formula)), formula);
+test("reads a v2 payload written before the plug-in existed", () => {
+  const stored = { v: 2, code: "$ integral_0^1 x^2 dif x $", fontSize: 42 };
+  assert.deepEqual(parseFormula(stored), { source: stored.code, fontSizePt: 42 });
 });
 
 test("reads a v1 payload (no font size) with fontSizePt left undefined", () => {
   const parsed = parseFormula({ v: 1, code: "x^2" });
   assert.deepEqual(parsed, { source: "x^2", fontSizePt: undefined });
-});
-
-test("stamps the payload with the format version", () => {
-  assert.equal((serializeFormula({ source: "x" }) as { v: number }).v, FORMULA_VERSION);
 });
 
 test("rejects payloads that are not PPTypst formulas", () => {

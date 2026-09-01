@@ -5,19 +5,67 @@
  */
 
 import type { DocumentOptions } from "./core/typst-document.ts";
+import type { GeometryOptions } from "./core/geometry.ts";
 import type { LayerNameOptions } from "./core/formula.ts";
 import type { FontSizeReference } from "./core/font-size.ts";
 
 /**
+ * The plug-in, as Cavalry knows it. `layerType` and the attribute ids must
+ * match `plugin/definitions.json` exactly — they are the contract between the
+ * panel (which writes them with `api.set`) and the shape script (which reads
+ * them as globals).
+ */
+export const PLUGIN = {
+  /** Folder name under `<AppData>/Cavalry/Third-Party/Plugins`. */
+  folder: "PPTypst",
+  /** `author` in definitions.json and strings.json. */
+  author: "pptypst",
+  /**
+   * The string `api.create` and `api.getLayerType` speak. Cavalry namespaces
+   * third-party types as `<author>::<type>` — undocumented, and confirmed with
+   * `api.getAllLayerTypes` (see `tools/probe.js`); a bare `pptypstFormula`
+   * silently creates nothing.
+   */
+  layerType: "pptypst::pptypstFormula",
+  /** `type` in definitions.json, i.e. {@link layerType} without the namespace. */
+  bareLayerType: "pptypstFormula",
+  /** Where the assets sit inside the installed plug-in folder. */
+  assetSubdir: "assets/vendor",
+  attributes: {
+    source: "typstSource",
+    fontSize: "typstFontSize",
+    geometry: "typstGeometry",
+    colours: "typstColours",
+  },
+} as const;
+
+/**
+ * Scene-space quirks.
+ *
+ * `flipY` negates y when outlines are turned into paths. Typst's SVG is
+ * y-down; if formulas land in the scene upside down, this is the one switch to
+ * flip. `platform/preview.ts` is unaffected — `ui.Draw` has its own, separately
+ * handled, y-up space.
+ */
+export const SCENE = { flipY: false };
+
+/** How outlines are trimmed on the way onto the layer. */
+export const GEOMETRY: GeometryOptions = {
+  // Typst emits three decimals in units of roughly a point; two keeps the
+  // payload (and so the .cv file) about a tenth smaller with no visible change.
+  precision: 2,
+};
+
+/**
  * Where the vendored wasm modules and fonts live.
  *
- * Leave empty to use the Cavalry convention: a `pptypst_assets/vendor` folder
- * next to the installed script (`<Cavalry Scripts>/pptypst_assets/vendor`).
- * That only works when the script is run from the Scripts menu — `ui.scriptLocation`
- * is blank when pasting into the JavaScript Editor — so set an absolute path
- * here for editor-based testing.
+ * Leave empty to search, in order: the installed plug-in folder
+ * (`<AppData>/Cavalry/Third-Party/Plugins/PPTypst/assets/vendor`), then the
+ * `pptypst_assets/vendor` convention next to an installed script. Set an
+ * absolute path here when running the panel straight from the JavaScript
+ * Editor, where `ui.scriptLocation` is blank.
  */
-export const ASSET_DIR_OVERRIDE: string = "C:/Users/domin/AppData/Roaming/Cavalry/Scripts/pptypst_assets/vendor";
+export const ASSET_DIR_OVERRIDE: string = "";
 
 /** Folder name looked for next to an installed script when no override is set. */
 export const ASSET_DIR_CONVENTION = "pptypst_assets/vendor";
@@ -66,11 +114,14 @@ export const LAYER_NAME: LayerNameOptions = {
   maxSourceChars: 20,
 };
 
-/** Name given to every vector layer inside a formula group. */
+/** Name given to every vector layer produced by "Break Apart". */
 export const SHAPE_LAYER_NAME = "Typst Shape";
 
-/** `api.setUserData` key under which a formula's source is stored on its group. */
-export const USER_DATA_KEY = "pptypst";
+/**
+ * `api.setUserData` key a v2 formula group was tagged with. Only read now, so
+ * scenes made before the plug-in existed can still be recognised.
+ */
+export const LEGACY_USER_DATA_KEY = "pptypst";
 
 /** Subfolder of the system temp directory used for SVG hand-off files. */
 export const TEMP_SUBDIR = "pptypst";
