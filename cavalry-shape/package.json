@@ -1,0 +1,32 @@
+{
+  "name": "pptypst-cavalry",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "PPTypst integration for the Cavalry animation software.",
+  "scripts": {
+    "assets": "node scripts/fetch-assets.mjs",
+    "build": "node build.mjs",
+    "test": "node --test",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
+    "lint": "eslint --config .config/eslint.mjs src test build.mjs scripts",
+    "check": "npm run typecheck && npm run lint && npm test",
+    "setup": "npm run assets && npm run build"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@scenery/cavalry-types": "^1.0.0",
+    "@stylistic/eslint-plugin": "^5.7",
+    "@types/node": "^26.4",
+    "esbuild": "^0.25",
+    "eslint": "^10.2",
+    "globals": "^17.5",
+    "typescript": "^6.0",
+    "typescript-eslint": "^8.69"
+  },
+  "dependencies": {
+    "@myriaddreamin/typst-ts-renderer": "^0.7.0-rc2",
+    "@myriaddreamin/typst-ts-web-compiler": "^0.7.0-rc2",
+    "@myriaddreamin/typst.ts": "^0.7.0-rc2"
+  }
+}

@@ -1,0 +1,81 @@
+<svg style="overflow: visible;" class="typst-doc" viewBox="0 0 174.000 81.000" width="174.000" height="81.000" data-width="174.000" data-height="81.000" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:h5="http://www.w3.org/1999/xhtml"><style type="text/css">.typst-text {
+  pointer-events: bounding-box;
+}
+
+.tsel span,
+.tsel {
+  left: 0;
+  position: fixed;
+  text-align: justify;
+  white-space: nowrap;
+  width: 100%;
+  height: 100%;
+  text-align-last: justify;
+  color: transparent;
+  white-space: pre;
+}
+.tsel span::-moz-selection,
+.tsel::-moz-selection {
+  color: transparent;
+  background: #7db9dea0;
+}
+.tsel span::selection,
+.tsel::selection {
+  color: transparent;
+  background: #7db9dea0;
+}
+.pseudo-link {
+  fill: transparent;
+  cursor: pointer;
+  pointer-events: all;
+}
+svg {
+  fill: none;
+}
+
+.outline_glyph path,
+path.outline_glyph {
+  fill: var(--glyph_fill);
+  stroke: var(--glyph_stroke);
+}
+
+.outline_glyph path,
+path.outline_glyph {
+  transition: 0.2s fill stroke;
+}
+.hover .typst-text {
+  --glyph_fill: #66bab7;
+  --glyph_stroke: #66bab7;
+}
+
+.typst-jump-ripple,
+.typst-debug-react-ripple {
+  width: 0;
+  height: 0;
+  background-color: transparent;
+  position: absolute;
+  border-radius: 50%;
+}
+.typst-jump-ripple {
+  border: 1px solid #66bab7;
+}
+.typst-debug-react-ripple {
+  border: 1px solid #cb1b45;
+}
+@keyframes typst-jump-ripple-effect {
+  to {
+    width: 10vw;
+    height: 10vw;
+    opacity: 0.01;
+    margin: -5vw;
+  }
+}
+@keyframes typst-debug-react-ripple-effect {
+  to {
+    width: 3vw;
+    height: 3vw;
+    opacity: 0.01;
+    margin: -1.5vw;
+  }
+}
+</style><defs class="glyph"><path id="gnnYj7xQ" class="outline_glyph" d="M 419 0 Q 384 3 257 3 Q 130 3 95 0 L 95 31 L 127 31 Q 190 31 205 40 Q 220 49 220 79 L 220 597 Q 168 571 89 571 L 89 602 Q 209 602 271 666 Q 288 666 291 662 Q 294 658 294 640 L 294 79 Q 294 49 308.5 40 Q 323 31 387 31 L 419 31 L 419 0 Z "/><path id="gnnYj7xY" class="outline_glyph" d="M 457 171 Q 457 93 395.5 35.5 Q 334 -22 244 -22 Q 161 -22 101.5 23 Q 42 68 42 135 Q 42 165 59 179 Q 76 193 98 193 Q 121 193 137.5 178 Q 154 163 154 137 Q 154 109 134.5 93.5 Q 115 78 88 82 Q 112 42 156 24 Q 200 6 241 6 Q 284 6 319 43 Q 354 80 354 171 Q 354 248 324 292.5 Q 294 337 235 337 L 191 337 Q 176 337 171.5 338.5 Q 167 340 167 348 Q 167 358 182 360 Q 197 360 221 363 Q 279 365 310 415 Q 338 462 338 529 Q 338 590 309 615.5 Q 280 641 242 641 Q 207 641 168.5 626.5 Q 130 612 109 579 Q 171 579 171 529 Q 171 507 157 492.5 Q 143 478 120 478 Q 98 478 83.5 492 Q 69 506 69 530 Q 69 587 120 626.5 Q 171 666 246 666 Q 320 666 375 627 Q 430 588 430 528 Q 430 469 391 420.5 Q 352 372 290 352 Q 366 337 411.5 285.5 Q 457 234 457 171 Z "/><path id="gnnYj7yA" class="outline_glyph" d="M 722 347 Q 722 339 716 333 Q 710 327 702 327 L 76 327 Q 68 327 62 333 Q 56 339 56 347 Q 56 355 62 361 Q 68 367 76 367 L 702 367 Q 710 367 716 361 Q 722 355 722 347 Z M 722 153 Q 722 145 716 139 Q 710 133 702 133 L 76 133 Q 68 133 62 139 Q 56 145 56 153 Q 56 161 62 167 Q 68 173 76 173 L 702 173 Q 710 173 716 167 Q 722 161 722 153 Z "/><path id="gnnYj70c" class="outline_glyph" d="M 527 0 L 380 -11 L 380 55 Q 328 -11 246 -11 Q 160 -11 97 55 Q 34 121 34 215 Q 34 310 100.5 376 Q 167 442 257 442 Q 333 442 383 380 L 383 596 Q 383 633 370 642.5 Q 357 652 305 652 L 305 683 L 449 694 L 449 87 Q 449 50 462 40.5 Q 475 31 527 31 L 527 0 Z M 380 118 L 380 323 Q 380 343 369 360 Q 328 420 261 420 Q 191 420 148 356 Q 117 308 117 214 Q 117 121 146 75 Q 186 11 251 11 Q 325 11 369 81 Q 380 98 380 118 Z "/><path id="gnnYj78gL" class="outline_glyph" d="M 527 376 Q 527 349 509.5 333.5 Q 492 318 473 318 Q 454 318 444.5 328.5 Q 435 339 435 353 Q 435 371 448.5 387 Q 462 403 483 407 Q 462 420 433 420 Q 361 420 334 302 L 300 165 Q 283 97 283 77 Q 283 49 297 30 Q 311 11 338 11 Q 371 11 410 41 Q 449 71 471 142 Q 474 153 484 153 Q 496 153 496 143 Q 496 132 485 108 Q 474 84 455 57 Q 436 30 404 9.5 Q 372 -11 336 -11 Q 294 -11 266 11.5 Q 238 34 228 65 Q 225 58 219 49.5 Q 213 41 199.5 25.5 Q 186 10 166 -0.5 Q 146 -11 123 -11 Q 86 -11 57.5 6 Q 29 23 29 55 Q 29 79 45 96 Q 61 113 84 113 Q 98 113 109.5 104.5 Q 121 96 121 78 Q 121 58 107.5 43 Q 94 28 74 24 Q 95 11 124 11 Q 156 11 181.5 39.5 Q 207 68 219 115 Q 273 319 273 353 Q 273 391 256 405.5 Q 239 420 219 420 Q 185 420 146.5 390 Q 108 360 85 289 Q 83 278 72 278 Q 60 278 60 288 Q 60 299 71 323 Q 82 347 101 374 Q 120 401 152.5 421.5 Q 185 442 221 442 Q 300 442 329 366 Q 369 442 434 442 Q 468 442 497.5 426.5 Q 527 411 527 376 Z "/><path id="gnnYj7/kS" class="outline_glyph" d="M 473 0 L 294 4 L 116 0 L 116 36 L 154 36 Q 203 36 224.5 41.5 Q 246 47 250 54.5 Q 254 62 254 82 L 254 592 Q 199 564 109 564 L 109 600 Q 240 600 305 664 Q 326 664 330.5 660 Q 335 656 335 636 L 335 82 Q 335 62 339 54.5 Q 343 47 364.5 41.5 Q 386 36 435 36 L 473 36 L 473 0 Z "/><path id="gnnYj7ygT" class="outline_glyph" d="M 505 182 L 475 0 L 63 0 Q 63 22 64.5 27 Q 66 32 73 39 L 314 277 Q 339 305 354.5 325 Q 370 345 389 387 Q 408 429 408 469 Q 408 534 367.5 581 Q 327 628 256 628 Q 214 628 172.5 605.5 Q 131 583 110 535 Q 144 535 156.5 518.5 Q 169 502 169 482 Q 169 457 152.5 443 Q 136 429 116 429 Q 107 429 97 432 Q 87 435 75 448.5 Q 63 462 63 485 Q 63 557 122 610.5 Q 181 664 271 664 Q 370 664 437.5 610.5 Q 505 557 505 469 Q 505 405 468 356.5 Q 431 308 362 253 Q 273 183 162 85 L 346 85 Q 437 85 445 91 Q 460 103 471 182 L 505 182 Z "/><path id="gnnYj7zsT" class="outline_glyph" d="M 516 319 Q 516 294 515.5 276.5 Q 515 259 510.5 221 Q 506 183 498 155 Q 490 127 472.5 91.5 Q 455 56 431.5 33.5 Q 408 11 370 -4.5 Q 332 -20 284 -20 Q 236 -20 198 -4.5 Q 160 11 136.5 33.5 Q 113 56 95.5 91.5 Q 78 127 70 155 Q 62 183 57.5 221 Q 53 259 52.5 276.5 Q 52 294 52 319 Q 52 344 52.5 361.5 Q 53 379 57.5 418 Q 62 457 70 485.5 Q 78 514 95.5 550 Q 113 586 136.5 609 Q 160 632 198 648 Q 236 664 284 664 Q 341 664 386.5 639.5 Q 432 615 457 578 Q 516 488 516 319 Z M 425 332 Q 425 488 408 545 Q 395 587 360.5 611.5 Q 326 636 284 636 Q 245 636 208.5 612.5 Q 172 589 158 536 Q 143 481 143 332 Q 143 176 157 117 Q 171 61 207.5 34.5 Q 244 8 284 8 Q 323 8 361 34 Q 399 60 412 121 Q 425 184 425 332 Z "/><path id="gnnYj71gY" class="outline_glyph" d="M 943 1268 Q 943 1243 928.5 1230.5 Q 914 1218 894 1218 Q 875 1218 860.5 1231 Q 846 1244 846 1267 Q 846 1287 859 1301 Q 872 1315 896 1316 Q 873 1339 836 1339 Q 795 1339 751 1161 Q 710 1007 643 619 Q 561 129 447 -337 Q 383 -597 345 -690 Q 281 -844 189 -859 Q 178 -861 167 -861 Q 121 -861 88.5 -833.5 Q 56 -806 56 -768 Q 56 -743 70.5 -730.5 Q 85 -718 105 -718 Q 124 -718 138.5 -731 Q 153 -744 153 -767 Q 153 -787 140 -801 Q 127 -815 104 -816 Q 129 -839 165 -839 Q 246 -839 310 -578 Q 345 -430 398 -119 Q 447 172 512 474.5 Q 577 777 604 883.5 Q 631 990 647 1048 Q 690 1207 734.5 1284 Q 779 1361 834 1361 Q 877 1361 910 1334 Q 943 1307 943 1268 Z "/></defs><defs class="clip-path"></defs><style type="text/css"></style><g class="typst-page" transform="translate(0, 0)" data-tid="pJebh5hmANLc9/XwzFYKV7I" data-page-width="174" data-page-height="81"><g data-tid="gJebh5hmANLc9/XwzFYKV7I" class="typst-group"><g transform="translate(3.000,3.000)" data-tid="pdtgfY6i5gHknRA2ysMtgow"><g data-tid="gdtgfY6i5gHknRA2ysMtgow" class="typst-group"><g transform="translate(0.000,0.000)" data-tid="p46CRfl1NLXoaBJCvA8lml8"><g data-tid="g46CRfl1NLXoaBJCvA8lml8" class="typst-group"><g transform="translate(0.000,44.122)" data-tid="pCDDrDS/fZF0e/sBJ4skRWI"><g data-tid="gCDDrDS/fZF0e/sBJ4skRWI" class="typst-text" fill="#000" transform="scale(0.028,-0.028)"><use x="0" y="0" href="#gnnYj71gY"/><g transform="scale(16,-16)"><foreignObject x="0" y="-50.38" width="62.44" height="62.50"><h5:div class="tsel" style="font-size: 62px">∫</h5:div></foreignObject></g></g></g><g transform="translate(27.972,13.014)" data-tid="pyT65m537CewsPfBX6Q/naA"><g data-tid="gyT65m537CewsPfBX6Q/naA" class="typst-text" fill="#000" transform="scale(0.0196,-0.0196)"><use x="0" y="0" href="#gnnYj7/kS"/><g transform="scale(16,-16)"><foreignObject x="0" y="-50.38" width="35.56" height="62.50"><h5:div class="tsel" style="font-size: 62px">1</h5:div></foreignObject></g></g></g><g transform="translate(15.120,73.830)" data-tid="poNAWTbBbT0MtKQsfKaE738"><g data-tid="goNAWTbBbT0MtKQsfKaE738" class="typst-text" fill="#000" transform="scale(0.0196,-0.0196)"><use x="0" y="0" href="#gnnYj7zsT"/><g transform="scale(16,-16)"><foreignObject x="0" y="-50.38" width="35.56" height="62.50"><h5:div class="tsel" style="font-size: 62px">0</h5:div></foreignObject></g></g></g><g transform="translate(45.359,44.122)" data-tid="pKPf4EkXerKcW9tz3+XG48s"><g data-tid="gKPf4EkXerKcW9tz3+XG48s" class="typst-text" fill="#000" transform="scale(0.028,-0.028)"><use x="0" y="0" href="#gnnYj78gL"/><g transform="scale(16,-16)"><foreignObject x="0" y="-50.38" width="35.75" height="62.50"><h5:div class="tsel" style="font-size: 62px">𝑥</h5:div></foreignObject></g></g></g><g transform="translate(61.375,33.958)" data-tid="p8dUVC0QRb04BIUsb1oVuWw"><g data-tid="g8dUVC0QRb04BIUsb1oVuWw" class="typst-text" fill="#000" transform="scale(0.0196,-0.0196)"><use x="0" y="0" href="#gnnYj7ygT"/><g transform="scale(16,-16)"><foreignObject x="0" y="-50.38" width="35.56" height="62.50"><h5:div class="tsel" style="font-size: 62px">2</h5:div></foreignObject></g></g></g><g transform="translate(78.762,44.122)" data-tid="po9Vvdm3ELCoimi37DIcciY"><g data-tid="go9Vvdm3ELCoimi37DIcciY" class="typst-text" fill="#000" transform="scale(0.028,-0.028)"><use x="0" y="0" href="#gnnYj70c"/><g transform="scale(16,-16)"><foreignObject x="0" y="-50.38" width="34.75" height="62.50"><h5:div class="tsel" style="font-size: 62px">d</h5:div></foreignObject></g></g></g><g transform="translate(94.330,44.122)" data-tid="pKPf4EkXerKcW9tz3+XG48s"><g data-tid="gKPf4EkXerKcW9tz3+XG48s" class="typst-text" fill="#000" transform="scale(0.028,-0.028)"><use x="0" y="0" href="#gnnYj78gL"/><g transform="scale(16,-16)"><foreignObject x="0" y="-50.38" width="35.75" height="62.50"><h5:div class="tsel" style="font-size: 62px">𝑥</h5:div></foreignObject></g></g></g><g transform="translate(118.124,44.122)" data-tid="pafYndaKHEUAj7TJc7OV2J0"><g data-tid="gafYndaKHEUAj7TJc7OV2J0" class="typst-text" fill="#000" transform="scale(0.028,-0.028)"><use x="0" y="0" href="#gnnYj7yA"/><g transform="scale(16,-16)"><foreignObject x="0" y="-50.38" width="48.62" height="62.50"><h5:div class="tsel" style="font-size: 62px">=</h5:div></foreignObject></g></g></g><g transform="translate(150.486,25.166)" data-tid="pzNrbcT2m2v4kAi9PdYOe50"><g data-tid="gzNrbcT2m2v4kAi9PdYOe50" class="typst-text" fill="#000" transform="scale(0.028,-0.028)"><use x="0" y="0" href="#gnnYj7xQ"/><g transform="scale(16,-16)"><foreignObject x="0" y="-50.38" width="31.25" height="62.50"><h5:div class="tsel" style="font-size: 62px">1</h5:div></foreignObject></g></g></g><g transform="translate(150.486,63.330)" data-tid="p6YLlUeLBR2kbsYtyDqUYPw"><g data-tid="g6YLlUeLBR2kbsYtyDqUYPw" class="typst-text" fill="#000" transform="scale(0.028,-0.028)"><use x="0" y="0" href="#gnnYj7xY"/><g transform="scale(16,-16)"><foreignObject x="0" y="-50.38" width="31.25" height="62.50"><h5:div class="tsel" style="font-size: 62px">3</h5:div></foreignObject></g></g></g><g transform="translate(150.486,37.122)" data-tid="pYxFd7Y5ObooiPXkC5ca1WQ"><g data-tid="gYxFd7Y5ObooiPXkC5ca1WQ"><path class="typst-shape" d="M 0 0 L 14 0 " stroke-width="1.12" stroke-miterlimit="4" fill-rule="nonzero" fill="none" stroke="#000" /></g></g><g transform="translate(0.000,0.000)" data-tid="p+QQhVUfHWQ83UzK6EJshlQ"><g data-tid="g+QQhVUfHWQ83UzK6EJshlQ" class="typst-content-hint" data-hint="a"></g></g></g></g><g transform="translate(0.000,0.000)" data-tid="p+QQhVUfHWQ83UzK6EJshlQ"><g data-tid="g+QQhVUfHWQ83UzK6EJshlQ" class="typst-content-hint" data-hint="a"></g></g></g></g></g></g></svg>
