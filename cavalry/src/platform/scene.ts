@@ -89,6 +89,7 @@ export function insertFormula(formula: Formula, svg: string, replaceLayerId?: st
     api.deleteLayer(toReplace);
   }
 
+  api.set(groupId, { hierarchy: false });
   api.setUserData(groupId, USER_DATA_KEY, serializeFormula(formula));
   api.select([groupId]);
 
