@@ -81,7 +81,7 @@ async function insert(): Promise<void> {
     panel.setStatus(replaces ? "Updated formula." : "Inserted formula.");
   } catch (error) {
     console.error("[pptypst] insert failed:", error);
-    panel.setStatus(`Failed: ${errorMessage(error)}`);
+    panel.setStatus(errorMessage(error));
   } finally {
     setBusy(false);
     void refreshPreview(); // catch up if the text changed mid-insert
@@ -143,6 +143,22 @@ previewTimer.setInterval(PREVIEW_DEBOUNCE_MS);
 let previewRendering = false;
 /** The source changed again while a render was running -- re-run when it ends. */
 let previewStale = false;
+/**
+ * True while the status line under the button is showing a Typst compile error
+ * from the live preview, so a later successful render knows to wipe it.
+ */
+let previewErrorShown = false;
+
+/** Puts a Typst compile error under the button; `null` clears one if shown. */
+function showCompileError(message: string | null): void {
+  if (message !== null) {
+    previewErrorShown = true;
+    panel.setStatus(message);
+  } else if (previewErrorShown) {
+    previewErrorShown = false;
+    panel.setStatus("");
+  }
+}
 
 function schedulePreview(): void {
   previewTimer.stop();
@@ -161,6 +177,7 @@ async function refreshPreview(): Promise<void> {
   const source = panel.getSource();
   if (!source) {
     panel.clearPreview();
+    showCompileError(null);
     return;
   }
 
@@ -168,9 +185,11 @@ async function refreshPreview(): Promise<void> {
   try {
     const svg = await engine.render(source, panel.getFontSizePt());
     panel.showPreview(svg);
+    showCompileError(null);
   } catch (error) {
     panel.clearPreview();
-    console.debug("[pptypst] preview render failed:", errorMessage(error));
+    // Surface Typst's own message under the button, e.g. "unknown variable: x".
+    showCompileError(errorMessage(error));
   } finally {
     previewRendering = false;
     if (previewStale) {

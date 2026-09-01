@@ -63,13 +63,12 @@ export interface TypstEngine {
 
 const MAIN_FILE = "/main.typ";
 
-/** Formats typst.ts diagnostics into a single readable string. */
 function formatDiagnostics(diagnostics: readonly unknown[]): string {
   return diagnostics
     .map((entry) => {
       if (typeof entry === "string") return entry;
-      const d = entry as { severity?: string; message?: string; range?: string };
-      return `${d.severity ?? "error"}${d.range ? ` [${d.range}]` : ""}: ${d.message ?? JSON.stringify(entry)}`;
+      const d = entry as { message?: string };
+      return d.message ?? JSON.stringify(entry);
     })
     .join("\n");
 }
@@ -150,7 +149,8 @@ export function createTypstEngine(options: TypstEngineOptions): TypstEngine {
     async render(source: string, fontSizePt: number): Promise<string> {
       await initOnce();
 
-      report("compiling Typst ...");
+      // Typst compiles + renders in well under a second, so there is no
+      // progress to report here -- only failures surface, as thrown errors.
       compiler.addSource(MAIN_FILE, buildTypstDocument(source, { ...document, fontSizePt }));
       const response = await compiler.compile({ mainFilePath: MAIN_FILE });
       const diagnostics: unknown = response.diagnostics;
@@ -158,7 +158,6 @@ export function createTypstEngine(options: TypstEngineOptions): TypstEngine {
         throw new Error(formatDiagnostics(diagnostics));
       }
 
-      report("rendering SVG ...");
       const svg: string = await renderer.renderSvg({
         format: "vector",
         artifactContent: response.result as Uint8Array,
