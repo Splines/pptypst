@@ -8,6 +8,7 @@
  */
 
 import { createPreview } from "./preview.ts";
+import { createResizeGrip } from "./resize-grip.ts";
 
 const EXAMPLE_SOURCE = "$ integral_0^1 x^2 dif x = 1/3 $";
 
@@ -47,6 +48,14 @@ export interface Panel {
 
 /** Matches the PowerPoint add-in's `<input id="fontSize" min="1" step="1.0">`. */
 const MIN_FONT_SIZE_PT = 1;
+/** Generous upper bound; keeps the field narrow (four digits) and sane. */
+const MAX_FONT_SIZE_PT = 1000;
+
+/** The editor's height before the user drags the grip, in pixels. */
+const EDITOR_DEFAULT_HEIGHT = 120;
+/** How far the grip may shrink / grow the editor, in pixels. */
+const EDITOR_MIN_HEIGHT = 72;
+const EDITOR_MAX_HEIGHT = 600;
 
 export function createPanel(handlers: PanelHandlers): Panel {
   ui.setTitle("PPTypst");
@@ -54,7 +63,14 @@ export function createPanel(handlers: PanelHandlers): Panel {
   const editor = new ui.MultiLineEdit();
   editor.setPlaceholder(`Typst source, e.g.  ${EXAMPLE_SOURCE}`);
   editor.setText(EXAMPLE_SOURCE);
-  editor.setMinimumHeight(120);
+
+  // A grab bar under the editor: drags resize it, and pinning it to a fixed
+  // height keeps it from stretching as the window grows taller.
+  const editorGrip = createResizeGrip(editor, {
+    defaultHeight: EDITOR_DEFAULT_HEIGHT,
+    minHeight: EDITOR_MIN_HEIGHT,
+    maxHeight: EDITOR_MAX_HEIGHT,
+  });
 
   const preview = createPreview();
 
@@ -62,7 +78,9 @@ export function createPanel(handlers: PanelHandlers): Panel {
   const fontSizeField = new ui.NumericField(MIN_FONT_SIZE_PT);
   fontSizeField.setType(0); // integer
   fontSizeField.setMin(MIN_FONT_SIZE_PT);
+  fontSizeField.setMax(MAX_FONT_SIZE_PT);
   fontSizeField.setStep(1);
+  fontSizeField.setMaximumWidth(55);
 
   const insertButton = new ui.Button("Insert");
   const status = new ui.Label("Ready.");
@@ -89,9 +107,10 @@ export function createPanel(handlers: PanelHandlers): Panel {
   fontSizeRow.add(fontSizeLabel, fontSizeField);
   fontSizeRow.addStretch();
 
-  ui.add(editor);
-  ui.add(preview.widget);
   ui.add(fontSizeRow);
+  ui.add(editor);
+  ui.add(editorGrip.widget);
+  ui.add(preview.widget);
   ui.add(insertButton);
   ui.add(status);
   ui.addStretch();
@@ -102,11 +121,14 @@ export function createPanel(handlers: PanelHandlers): Panel {
   // `ui.size()` is typed `unknown` by the Cavalry types.
   const panelWidth = (): number => (ui.size() as { width: number }).width - 6;
   ui.onResize = () => {
-    preview.setWidth(panelWidth());
+    const width = panelWidth();
+    preview.setWidth(width);
+    editorGrip.setWidth(width);
   };
 
   ui.show();
   preview.setWidth(panelWidth());
+  editorGrip.setWidth(panelWidth());
 
   return {
     getSource: () => editor.getText().trim(),
