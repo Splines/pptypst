@@ -65,20 +65,39 @@ function importSvgAsGroup(svg: string, name: string): string {
  * Inserts `formula` into the scene as vector layers rendered from `svg`, tags
  * the resulting group with the formula source, selects it and returns its id.
  *
- * When `replaceLayerId` refers to a layer that still exists it is deleted
- * first, so editing a formula replaces it rather than stacking a copy on top.
- * The replacement is not moved to the old group's transform yet.
+ * When `replaceLayerId` refers to a layer that still exists it is deleted, so
+ * editing a formula replaces it rather than stacking a copy on top, and the new
+ * group is nudged so its centre lands on the old one's centre (mirrors the
+ * PowerPoint add-in's `calculateCenteredPosition`). Rotation and scale are not
+ * carried over.
  */
 export function insertFormula(formula: Formula, svg: string, replaceLayerId?: string): string {
   const name = formulaLayerName(formula.source, LAYER_NAME);
+
+  const toReplace = replaceLayerId !== undefined && api.layerExists(replaceLayerId)
+    ? replaceLayerId
+    : null;
+  // Capture the old formula's centre before it is deleted.
+  const oldCentre = toReplace
+    ? api.getBoundingBox(toReplace, true).centre
+    : null;
+
   const groupId = importSvgAsGroup(svg, name);
 
-  if (replaceLayerId && api.layerExists(replaceLayerId)) {
-    api.deleteLayer(replaceLayerId);
+  if (toReplace) {
+    api.deleteLayer(toReplace);
   }
 
   api.setUserData(groupId, USER_DATA_KEY, serializeFormula(formula));
   api.select([groupId]);
+
+  if (oldCentre) {
+    // Both the bounding box and api.move work in scene units; move shifts the
+    // freshly selected group by the delta between the two centres.
+    const newCentre = api.getBoundingBox(groupId, true).centre;
+    api.move(oldCentre.x - newCentre.x, oldCentre.y - newCentre.y);
+  }
+
   return groupId;
 }
 

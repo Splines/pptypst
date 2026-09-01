@@ -98,5 +98,5 @@ inside Cavalry before it ships.
 
 - The pasted script is not self-contained; it needs `assets/vendor/` on disk.
 - Typst package imports (`#import "@preview/…"`) are unsupported (no registry).
-- Updating a formula deletes and recreates it, so the new group does not inherit
-  the old one's transform.
+- Updating a formula deletes and recreates it. The new group is re-centred on
+  the old one's centre, but its rotation and scale are not carried over.
