@@ -38,10 +38,67 @@ export function getActiveCompHeightPx(): number {
   return typeof height === "number" ? height : 0;
 }
 
-/** Attribute ids a composition might expose its background colour under. */
-const COMP_BACKGROUND_ATTRS = ["backgroundColor", "worldColor", "bgColor"];
+/**
+ * Attribute ids a composition might expose its background colour under, tried
+ * in order. Cavalry's Composition Settings labels it "Background"; the exact
+ * scripting id has varied between builds, so a scan of every attribute (see
+ * {@link looksLikeBackgroundColorAttr}) backs these up.
+ */
+const COMP_BACKGROUND_ATTRS = ["backgroundColor", "background", "worldColor", "bgColor"];
 /** Matches the hex-string forms `api.get` returns a colour as. */
 const HEX_COLOR = /^#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
+
+/** Whether `attrId` plausibly names a composition's background-colour attribute. */
+function looksLikeBackgroundColorAttr(attrId: string): boolean {
+  const id = attrId.toLowerCase();
+  if (id.includes("background")) {
+    return true;
+  }
+  const looksColour = id.includes("color") || id.includes("colour");
+  return looksColour && (id.includes("world") || id.includes("bg"));
+}
+
+/** One 0..255 channel as a two-digit hex pair. */
+function channelHex(n: number): string {
+  return Math.max(0, Math.min(255, Math.round(n))).toString(16).padStart(2, "0");
+}
+
+/**
+ * Builds `#rrggbb` from three channels. `[r, g, b]` are taken as 0..255 unless
+ * every one is <= 1, in which case they are read as Cavalry's normalised 0..1.
+ */
+function rgbToHex(r: number, g: number, b: number): string {
+  const normalised = r <= 1 && g <= 1 && b <= 1;
+  const scale = normalised ? 255 : 1;
+  return `#${channelHex(r * scale)}${channelHex(g * scale)}${channelHex(b * scale)}`;
+}
+
+/**
+ * `value` as a `#rrggbb` string, or `null` when it isn't a colour. `api.get`
+ * returns a colour attribute in one of several shapes across Cavalry builds: a
+ * hex string, an `rgb()/rgba()` string, an `[r, g, b, a]` array, or an
+ * `{ r, g, b, a }` object -- the last two either 0..255 or normalised 0..1.
+ */
+function asHexColor(value: unknown): string | null {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (HEX_COLOR.test(trimmed)) {
+      return trimmed.length >= 7 ? trimmed.slice(0, 7) : trimmed;
+    }
+    const rgb = trimmed.match(/^rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)/i);
+    return rgb ? rgbToHex(Number(rgb[1]), Number(rgb[2]), Number(rgb[3])) : null;
+  }
+  if (Array.isArray(value) && value.length >= 3 && value.slice(0, 3).every(n => typeof n === "number")) {
+    return rgbToHex(value[0], value[1], value[2]);
+  }
+  if (value !== null && typeof value === "object") {
+    const c = value as Record<string, unknown>;
+    if (typeof c.r === "number" && typeof c.g === "number" && typeof c.b === "number") {
+      return rgbToHex(c.r, c.g, c.b);
+    }
+  }
+  return null;
+}
 
 /**
  * The active composition's background colour as a hex string, or `null` when
@@ -53,15 +110,21 @@ export function getActiveCompBackgroundHex(): string | null {
   if (!compId) {
     return null;
   }
-  for (const attr of COMP_BACKGROUND_ATTRS) {
-    let value: unknown;
-    try {
-      value = api.get(compId, attr);
-    } catch {
-      continue; // attribute doesn't exist on this build's comp -- try the next
+
+  // Known ids first, then any other attribute whose id looks like a background
+  // colour -- the scripting path has changed between Cavalry builds.
+  // `api.hasAttribute` keeps `api.get` from logging an error for a missing one.
+  const candidates = [
+    ...COMP_BACKGROUND_ATTRS,
+    ...api.getAttributes(compId).filter(looksLikeBackgroundColorAttr),
+  ];
+  for (const attr of candidates) {
+    if (!api.hasAttribute(compId, attr)) {
+      continue;
     }
-    if (typeof value === "string" && HEX_COLOR.test(value)) {
-      return value;
+    const hex = asHexColor(api.get(compId, attr));
+    if (hex) {
+      return hex;
     }
   }
   return null;
