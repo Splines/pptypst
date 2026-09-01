@@ -4,41 +4,73 @@ import globals from "globals";
 import tseslint from "typescript-eslint";
 import { defineConfig } from "eslint/config";
 
+/** Shared style rules, so sources and tests are formatted identically. */
+const style = {
+  ...stylistic.configs.customize({
+    indent: 2,
+    jsx: false,
+    semi: true,
+    braceStyle: "1tbs",
+  }).rules,
+  "@stylistic/quotes": ["error", "double", { avoidEscape: true }],
+  // The base rule flags parameter names in type signatures; the TS-aware
+  // version understands them.
+  "no-unused-vars": "off",
+  "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_" }],
+};
+
+const typeChecked = [
+  eslint.configs.recommended,
+  tseslint.configs.recommendedTypeChecked,
+  tseslint.configs.strictTypeChecked,
+];
+
 export default defineConfig([
   {
     ignores: [
       "node_modules/",
       "dist/",
       "assets/",
-      "src/vendor/",
       "**/*.d.ts",
     ],
   },
   {
+    // The Cavalry script itself: no Node, no DOM -- only the globals Cavalry
+    // provides (declared by @scenery/cavalry-types).
     files: ["src/**/*.ts"],
-    plugins: {
-      "@stylistic": stylistic,
-    },
-    extends: [
-      eslint.configs.recommended,
-      tseslint.configs.recommendedTypeChecked,
-      tseslint.configs.strictTypeChecked,
-    ],
-    rules: {
-      ...stylistic.configs.customize({
-        indent: 2,
-        jsx: false,
-        semi: true,
-        braceStyle: "1tbs",
-      }).rules,
-      "@stylistic/quotes": ["error", "double", { avoidEscape: true }],
-      "no-unused-vars": ["error", { argsIgnorePattern: "^_" }],
-    },
+    plugins: { "@stylistic": stylistic },
+    extends: typeChecked,
+    rules: style,
     languageOptions: {
       ecmaVersion: 2021,
       sourceType: "module",
       parserOptions: {
         projectService: true,
+        tsconfigRootDir: import.meta.dirname + "/..",
+      },
+    },
+  },
+  {
+    // Tests run on Node, against the pure `src/core` modules.
+    files: ["test/**/*.ts"],
+    plugins: { "@stylistic": stylistic },
+    extends: typeChecked,
+    rules: {
+      ...style,
+      // `node --test` collects the promises that `test()` returns.
+      "@typescript-eslint/no-floating-promises": "off",
+      // Assertions on deliberately malformed input need loose types.
+      "@typescript-eslint/no-unsafe-assignment": "off",
+      "@typescript-eslint/no-unsafe-member-access": "off",
+      // SVG fixtures are full of double quotes; backticks keep them readable.
+      "@stylistic/quotes": ["error", "double", { avoidEscape: true, allowTemplateLiterals: "always" }],
+    },
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: "module",
+      globals: { ...globals.node },
+      parserOptions: {
+        project: "./tsconfig.test.json",
         tsconfigRootDir: import.meta.dirname + "/..",
       },
     },
@@ -50,9 +82,7 @@ export default defineConfig([
     languageOptions: {
       ecmaVersion: 2022,
       sourceType: "module",
-      globals: {
-        ...globals.node,
-      },
+      globals: { ...globals.node },
     },
   },
 ]);

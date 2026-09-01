@@ -1,0 +1,15 @@
+{
+    // Tests run on Node (node --test with native type stripping), so they need
+    // Node's types on top of the Cavalry ones the sources use.
+    "extends": "./tsconfig.json",
+    "compilerOptions": {
+        "types": [
+            "@scenery/cavalry-types",
+            "node"
+        ]
+    },
+    "include": [
+        "src/**/*.ts",
+        "test/**/*.ts"
+    ]
+}

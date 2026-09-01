@@ -3,13 +3,15 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "PPTypst integration for the Cavalry animation software (prototype).",
+  "description": "PPTypst integration for the Cavalry animation software.",
   "scripts": {
     "assets": "node scripts/fetch-assets.mjs",
     "build": "node build.mjs",
-    "typecheck": "tsc --noEmit",
-    "lint": "eslint --config .config/eslint.mjs src build.mjs scripts",
-    "prepare-all": "npm run assets && npm run build"
+    "test": "node --test",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
+    "lint": "eslint --config .config/eslint.mjs src test build.mjs scripts",
+    "check": "npm run typecheck && npm run lint && npm test",
+    "setup": "npm run assets && npm run build"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

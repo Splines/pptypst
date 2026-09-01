@@ -1,23 +1,24 @@
 /**
- * Cavalry-engine shims typst.ts needs, plus a base64 decoder for reading the
- * wasm/font bytes Cavalry hands us via `api.encodeBinary`.
+ * Shims for globals Cavalry's JavaScript engine does not provide but the
+ * typst.ts / wasm-bindgen glue references.
  *
- * `TextEncoder`/`TextDecoder`/`queueMicrotask`/`fetch` all read as `undefined`
- * on a fresh Cavalry engine. Earlier probing here mistakenly concluded the
- * first three were unnecessary: it tested "install the shim, then `delete` it"
- * rather than "never touch the global at all", and Cavalry's engine appears to
- * lazily register its (otherwise identical) native versions of these the first
- * time anything *touches* `globalThis.X` -- including our own assignment --
- * after which the native binding persists even once our value is deleted. That
- * made the delete-based test pass regardless of whether the shim is actually
- * needed. Skipping the install outright (i.e. never touching the global) is
- * what a real "is this needed" test has to do, and doing that for real in
- * production showed `TextDecoder` truly is needed. Out of the same caution,
- * `queueMicrotask` -- "proven" unnecessary by the same flawed method -- is
- * kept here too, until it's re-verified with a test that never touches it.
+ * `TextEncoder`, `TextDecoder`, `fetch` and `queueMicrotask` all read as
+ * `undefined` on a fresh Cavalry engine, and the wasm glue references them by
+ * bare identifier, so without these it throws `ReferenceError` during compiler
+ * init. `fetch` is only ever referenced, never called — every font is handed to
+ * the compiler as bytes (see `engine.ts`) — so a throwing stub is enough.
  *
- * Import this module for its side effects **before** anything that touches
- * typst.ts (see `typst.ts`).
+ * A note on verifying whether a shim is still needed: testing it by installing
+ * the shim and then `delete`-ing the global does NOT work. Cavalry appears to
+ * lazily register its own native version of some of these the first time
+ * anything touches `globalThis.X` (our assignment counts), and that binding
+ * then survives the delete — so the test passes whether or not the shim
+ * matters. A valid test has to never touch the global at all, i.e. build a
+ * variant with the install code physically removed. `TextDecoder` was dropped
+ * on the strength of the bad test and immediately broke in production.
+ *
+ * Imported for side effects, and it must be evaluated before any typst.ts
+ * module — see the import order in `engine.ts`.
  */
 
 const g = globalThis as Record<string, unknown>;
@@ -138,43 +139,4 @@ if (typeof g.queueMicrotask !== "function") {
   g.queueMicrotask = (cb: () => void): void => {
     void Promise.resolve().then(cb);
   };
-}
-
-/* -------------------------------------------------------------------------- */
-/* base64                                                                    */
-/* -------------------------------------------------------------------------- */
-
-const B64_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-const B64_LOOKUP = (() => {
-  const table = new Int16Array(256).fill(-1);
-  for (let i = 0; i < B64_CHARS.length; i++) {
-    table[B64_CHARS.charCodeAt(i)] = i;
-  }
-  table["=".charCodeAt(0)] = 0;
-  return table;
-})();
-
-/**
- * Decodes a base64 string (as returned by `api.encodeBinary`) into raw bytes.
- * Tolerates whitespace and missing padding.
- */
-export function base64ToBytes(base64: string): Uint8Array {
-  const clean = base64.replace(/[^A-Za-z0-9+/=]/g, "");
-  const padding = clean.endsWith("==") ? 2 : clean.endsWith("=") ? 1 : 0;
-  const byteLength = Math.floor((clean.length * 3) / 4) - padding;
-  const bytes = new Uint8Array(byteLength);
-
-  let p = 0;
-  for (let i = 0; i < clean.length; i += 4) {
-    const c0 = B64_LOOKUP[clean.charCodeAt(i)];
-    const c1 = B64_LOOKUP[clean.charCodeAt(i + 1)];
-    const c2 = B64_LOOKUP[clean.charCodeAt(i + 2)];
-    const c3 = B64_LOOKUP[clean.charCodeAt(i + 3)];
-
-    const chunk = (c0 << 18) | (c1 << 12) | (c2 << 6) | c3;
-    if (p < byteLength) bytes[p++] = (chunk >> 16) & 0xff;
-    if (p < byteLength) bytes[p++] = (chunk >> 8) & 0xff;
-    if (p < byteLength) bytes[p++] = chunk & 0xff;
-  }
-  return bytes;
 }
