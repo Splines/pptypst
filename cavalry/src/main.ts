@@ -25,8 +25,8 @@ const panel = createPanel({
   onInsert: () => {
     void insert();
   },
-  onLoadFromSelection: () => {
-    loadFromSelection();
+  onSelectionChanged: () => {
+    syncToSelection();
   },
 });
 
@@ -37,8 +37,15 @@ const engine = createTypstEngine({
   onProgress: panel.setStatus,
 });
 
-/** The formula currently being edited, if it is still in the scene. */
+/** The formula currently loaded for editing, if it is still in the scene. */
 let editingLayerId: string | null = null;
+
+/**
+ * True while a render is in flight. Selection sync is paused for the duration
+ * so a click in the scene can't swap the editor source out from under an
+ * insert that is already using the text captured when it started.
+ */
+let busy = false;
 
 async function insert(): Promise<void> {
   const source = panel.getSource();
@@ -52,26 +59,59 @@ async function insert(): Promise<void> {
     ? editingLayerId
     : undefined;
 
-  panel.setBusy(true);
+  setBusy(true);
   try {
     const svg = await engine.render(source);
     editingLayerId = insertFormula({ source }, svg, replaces);
+    panel.setEditing(true);
     panel.setStatus(replaces ? "Updated formula." : "Inserted formula.");
   } catch (error) {
     console.error("[pptypst] insert failed:", error);
     panel.setStatus(`Failed: ${errorMessage(error)}`);
   } finally {
-    panel.setBusy(false);
+    setBusy(false);
   }
 }
 
-function loadFromSelection(): void {
-  const found = findSelectedFormula();
-  if (!found) {
-    panel.setStatus("Select a 'PPTypst: ...' group (or a layer inside one) first.");
+/**
+ * Mirrors the scene selection into the panel: selecting a PPTypst group loads
+ * its source and turns the action into "Update"; selecting anything else (or
+ * nothing) leaves the editor as-is and puts the action back to "Insert", which
+ * then creates a fresh group.
+ */
+function syncToSelection(): void {
+  if (busy) {
     return;
   }
-  panel.setSource(found.formula.source);
+
+  const found = findSelectedFormula();
+
+  if (!found) {
+    if (editingLayerId !== null) {
+      editingLayerId = null;
+      panel.setEditing(false);
+      panel.setStatus("No formula selected — Insert creates a new one.");
+    }
+    return;
+  }
+
+  if (found.layerId === editingLayerId) {
+    // Already editing this one (e.g. the group we just inserted and selected);
+    // don't reload and clobber any edits in progress.
+    panel.setEditing(true);
+    return;
+  }
+
   editingLayerId = found.layerId;
-  panel.setStatus("Loaded source. Edit it and press Insert to replace that formula.");
+  panel.setSource(found.formula.source);
+  panel.setEditing(true);
+  panel.setStatus("Loaded formula from selection — Insert now updates it.");
 }
+
+function setBusy(value: boolean): void {
+  busy = value;
+  panel.setBusy(value);
+}
+
+// Reflect whatever happens to be selected when the panel opens.
+syncToSelection();

@@ -3,10 +3,12 @@
 Brings PPTypst's "type Typst → get vector paths" workflow into the
 [Cavalry](https://cavalry.studio) animation app as a pasteable script.
 
-A small window with a Typst editor and an **Insert** button. Insert compiles the
+A small window with a Typst editor and one action button. **Insert** compiles the
 Typst to SVG and imports it as vector layers grouped under `PPTypst: <formula>`,
-storing the raw source on the group. **Load from selection** reads that source
-back so a formula can be edited and re-inserted.
+storing the raw source on the group. Selecting such a group in the scene loads
+its source back into the editor and turns the button into **Update**, which
+replaces that formula in place; with nothing PPTypst selected the button reverts
+to **Insert** and creates a fresh group.
 
 ## Setup
 
