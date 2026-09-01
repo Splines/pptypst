@@ -54,6 +54,9 @@ export const LAYER_NAME: LayerNameOptions = {
   maxSourceChars: 20,
 };
 
+/** Name given to every vector layer inside a formula group. */
+export const SHAPE_LAYER_NAME = "Typst Shape";
+
 /** `api.setUserData` key under which a formula's source is stored on its group. */
 export const USER_DATA_KEY = "pptypst";
 

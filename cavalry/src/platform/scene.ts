@@ -12,7 +12,7 @@ import {
   serializeFormula,
   type Formula,
 } from "../core/formula.ts";
-import { LAYER_NAME, USER_DATA_KEY } from "../config.ts";
+import { LAYER_NAME, SHAPE_LAYER_NAME, USER_DATA_KEY } from "../config.ts";
 import { writeTempFile } from "./files.ts";
 
 /** A formula found in the scene, together with the group carrying it. */
@@ -30,7 +30,8 @@ const MAX_ANCESTOR_DEPTH = 32;
  * `api.convertSVGToLayers` returns the wrapping group it makes *and* all of its
  * descendants. When there is exactly one such root it is reused as the formula
  * group (renamed in place), so the result is one folder -- not `name` wrapped
- * around Cavalry's own "SVG Layer N".
+ * around Cavalry's own "SVG Layer N". The vector layers inside are then renamed
+ * and flipped by {@link tidyShapeLayers}.
  */
 function importSvgAsGroup(svg: string, name: string): string {
   // typst.ts's SVG needs flattening first; Cavalry's importer cannot resolve
@@ -48,18 +49,41 @@ function importSvgAsGroup(svg: string, name: string): string {
     return !parent || !imported.has(parent);
   });
 
+  let groupId: string;
   if (roots.length === 1) {
     api.rename(roots[0], name);
-    return roots[0];
-  }
-
-  const groupId = api.create("group", name);
-  for (const id of roots) {
-    if (api.layerExists(id)) {
-      api.parent(id, groupId);
+    groupId = roots[0];
+  } else {
+    groupId = api.create("group", name);
+    for (const id of roots) {
+      if (api.layerExists(id)) {
+        api.parent(id, groupId);
+      }
     }
   }
+
+  tidyShapeLayers(groupId);
   return groupId;
+}
+
+/**
+ * Renames every vector layer in the group to {@link SHAPE_LAYER_NAME} and
+ * reverses their stacking, so the shape drawn first in the SVG (Cavalry drops it
+ * at the bottom) ends up at the top of the group.
+ */
+function tidyShapeLayers(groupId: string): void {
+  // `sortLayerIdsByHierarchy` gives top-to-bottom order; the user's stated
+  // "first-drawn at the bottom" makes the reverse the SVG paint order.
+  const paintOrder = api.sortLayerIdsByHierarchy(api.getChildren(groupId)).reverse();
+
+  for (const id of paintOrder) {
+    api.rename(id, SHAPE_LAYER_NAME);
+  }
+  // Chain each layer directly below its predecessor so the final top-to-bottom
+  // order is the paint order.
+  for (let i = 1; i < paintOrder.length; i++) {
+    api.reorder(paintOrder[i], paintOrder[i - 1]);
+  }
 }
 
 /**
