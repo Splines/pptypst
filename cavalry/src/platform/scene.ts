@@ -78,10 +78,13 @@ export function insertFormula(formula: Formula, svg: string, replaceLayerId?: st
   const toReplace = replaceLayerId !== undefined && api.layerExists(replaceLayerId)
     ? replaceLayerId
     : null;
-  // Capture the old formula's centre before it is deleted.
+  // Capture the old formula's centre and expand/collapse state before it is
+  // deleted. A fresh insert starts collapsed (its glyph paths are Scene-window
+  // noise); an update keeps whatever state the user had the old group in.
   const oldCentre = toReplace
     ? api.getBoundingBox(toReplace, true).centre
     : null;
+  const expanded = toReplace ? api.get(toReplace, "hierarchy") === true : false;
 
   const groupId = importSvgAsGroup(svg, name);
 
@@ -89,7 +92,7 @@ export function insertFormula(formula: Formula, svg: string, replaceLayerId?: st
     api.deleteLayer(toReplace);
   }
 
-  api.set(groupId, { hierarchy: false });
+  api.set(groupId, { hierarchy: expanded });
   api.setUserData(groupId, USER_DATA_KEY, serializeFormula(formula));
   api.select([groupId]);
 
