@@ -9,6 +9,7 @@
 
 import { createPreview } from "./preview.ts";
 import { createResizeGrip } from "./resize-grip.ts";
+import { createSizeField } from "./size-field.ts";
 
 const EXAMPLE_SOURCE = "$ integral_0^1 x^2 dif x = 1/3 $";
 
@@ -74,13 +75,15 @@ export function createPanel(handlers: PanelHandlers): Panel {
 
   const preview = createPreview();
 
-  const fontSizeLabel = new ui.Label("Size");
-  const fontSizeField = new ui.NumericField(MIN_FONT_SIZE_PT);
-  fontSizeField.setType(0); // integer
-  fontSizeField.setMin(MIN_FONT_SIZE_PT);
-  fontSizeField.setMax(MAX_FONT_SIZE_PT);
-  fontSizeField.setStep(1);
-  fontSizeField.setMaximumWidth(55);
+  const fontSizeField = createSizeField({
+    label: "Size",
+    value: MIN_FONT_SIZE_PT,
+    min: MIN_FONT_SIZE_PT,
+    max: MAX_FONT_SIZE_PT,
+    onChange: () => {
+      handlers.onFontSizeChanged();
+    },
+  });
 
   const insertButton = new ui.Button("Insert");
   const status = new ui.Label("Ready.");
@@ -90,9 +93,6 @@ export function createPanel(handlers: PanelHandlers): Panel {
   };
   editor.onValueChanged = () => {
     handlers.onSourceChanged();
-  };
-  fontSizeField.onValueChanged = () => {
-    handlers.onFontSizeChanged();
   };
 
   // Cavalry invokes this whenever the scene selection changes, letting the
@@ -104,7 +104,7 @@ export function createPanel(handlers: PanelHandlers): Panel {
   });
 
   const fontSizeRow = new ui.HLayout();
-  fontSizeRow.add(fontSizeLabel, fontSizeField);
+  fontSizeRow.add(fontSizeField.widget);
   fontSizeRow.addStretch();
 
   ui.add(fontSizeRow);
