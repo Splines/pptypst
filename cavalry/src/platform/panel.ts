@@ -66,15 +66,18 @@ const MIN_FONT_SIZE_PT = 1;
 const MAX_FONT_SIZE_PT = 1000;
 
 /** The editor's height before the user drags the grip, in pixels. */
-const EDITOR_DEFAULT_HEIGHT = 80;
+const EDITOR_DEFAULT_HEIGHT = 60;
 /** How far the grip may shrink / grow the editor, in pixels. */
-const EDITOR_MIN_HEIGHT = 50;
+const EDITOR_MIN_HEIGHT = 45;
 const EDITOR_MAX_HEIGHT = 600;
+/** Editor text size, in pixels; the toolkit default is too small to read comfortably. */
+const EDITOR_FONT_SIZE_PX = 18;
 
 export function createPanel(handlers: PanelHandlers): Panel {
   ui.setTitle("PPTypst");
 
   const editor = new ui.MultiLineEdit();
+  editor.setFontSize(EDITOR_FONT_SIZE_PX);
 
   const mathDelimiters = createMathDelimiters();
 
