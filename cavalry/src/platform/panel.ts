@@ -159,7 +159,7 @@ export function createPanel(handlers: PanelHandlers): Panel {
   });
 
   // Fill colour for the inserted formula (not the preview strip, which stays a
-  // fixed white-on-black readability check). The real default is seeded by the
+  // fixed white-on-dark readability check). The real default is seeded by the
   // app from the saved preference or the composition background.
   const colorField = createColorField({
     label: "Color",
@@ -206,6 +206,10 @@ export function createPanel(handlers: PanelHandlers): Panel {
   };
 
   const insertButton = new ui.Button("Insert");
+  // Taller than the toolkit default, with symmetric padding so the label sits
+  // in the vertical centre rather than riding high in the box.
+  insertButton.setFixedHeight(30);
+  insertButton.setContentsMargins(0, 0, 0, 0);
   const status = new ui.Label("Ready.");
 
   insertButton.onClick = () => {

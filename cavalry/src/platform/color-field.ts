@@ -10,7 +10,7 @@ const CAPTION_INK = "#8a8a8a";
 /** Corner rounding and pill size, in pixels, to match the Size field. */
 const RADIUS = 3;
 const HEIGHT = 22;
-const WIDTH = 94;
+const WIDTH = 92;
 /** Caption column width; the swatch sits to its right at a fixed gap. */
 const CAPTION_WIDTH = 42;
 /** Swatch size, in pixels; sits inside the pill with a little breathing room. */

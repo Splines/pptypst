@@ -17,8 +17,12 @@ const HEIGHT = 190;
 const MIN_WIDTH = 320;
 /** Inset so glyphs never touch the widget edge, in pixels. */
 const PADDING = 14;
-/** Black backdrop with white ink, to sit on Cavalry's dark interface. */
-const BACKGROUND = "#000000";
+/**
+ * Dark backdrop with white ink. A touch darker than the `#2d2d2d` pill used by
+ * the Size, Color and "$" widgets -- close enough that the panel still reads as
+ * one surface, but with more contrast under the white preview.
+ */
+const BACKGROUND = "#1e1e1e";
 const INK = "#ffffff";
 
 export interface Preview {
