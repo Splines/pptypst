@@ -44,16 +44,14 @@ export function parseFormula(raw: unknown): Formula | null {
 }
 
 export interface LayerNameOptions {
-  prefix: string;
-  /** Longest run of formula source kept in the name before it is ellipsised. */
+  /** Longest run of formula source kept in the name; the rest is dropped. */
   maxSourceChars: number;
 }
 
-/** e.g. `PPTypst: integral_0…` for the source `integral_0^1 x^2 dif x`. */
+/** e.g. `integral_0^1 x^2 dif` for the source `$ integral_0^1 x^2 dif x = 1/3 $`. */
 export function formulaLayerName(source: string, options: LayerNameOptions): string {
   const oneLine = source.replace(/\s+/g, " ").trim();
-  const truncated = oneLine.length > options.maxSourceChars
-    ? `${oneLine.slice(0, options.maxSourceChars)}…`
-    : oneLine;
-  return `${options.prefix}: ${truncated}`;
+  // Drop the Typst math delimiters so the name is just the expression.
+  const unwrapped = oneLine.replace(/^\$+\s*/, "").replace(/\s*\$+$/, "").trim();
+  return (unwrapped || oneLine).slice(0, options.maxSourceChars);
 }

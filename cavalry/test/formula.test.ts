@@ -8,7 +8,7 @@ import {
   serializeFormula,
 } from "../src/core/formula.ts";
 
-const naming = { prefix: "PPTypst", maxSourceChars: 10 };
+const naming = { maxSourceChars: 20 };
 
 test("round-trips a formula through the stored payload", () => {
   const formula = { source: "$ integral_0^1 x^2 dif x $" };
@@ -26,9 +26,13 @@ test("rejects payloads that are not PPTypst formulas", () => {
 });
 
 test("names a layer after a short formula in full", () => {
-  assert.equal(formulaLayerName("x^2", naming), "PPTypst: x^2");
+  assert.equal(formulaLayerName("x^2", naming), "x^2");
 });
 
-test("ellipsises a long formula and collapses whitespace", () => {
-  assert.equal(formulaLayerName("integral_0^1   x^2\n dif x", naming), "PPTypst: integral_0…");
+test("truncates a long formula without an ellipsis and collapses whitespace", () => {
+  assert.equal(formulaLayerName("integral_0^1   x^2\n dif x = 1/3", naming), "integral_0^1 x^2 dif");
+});
+
+test("strips the surrounding Typst math delimiters", () => {
+  assert.equal(formulaLayerName("$ integral_0^1 x^2 dif x = 1/3 $", naming), "integral_0^1 x^2 dif");
 });

@@ -51,8 +51,7 @@ export const DOCUMENT: DocumentOptions = {
 
 /** How the group created for each formula is named. */
 export const LAYER_NAME: LayerNameOptions = {
-  prefix: "PPTypst",
-  maxSourceChars: 10,
+  maxSourceChars: 20,
 };
 
 /** `api.setUserData` key under which a formula's source is stored on its group. */

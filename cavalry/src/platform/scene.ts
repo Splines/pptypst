@@ -27,8 +27,10 @@ const MAX_ANCESTOR_DEPTH = 32;
 /**
  * Imports `svg` and returns the id of the single group holding the result.
  *
- * `api.convertSVGToLayers` already wraps a multi-layer SVG in its own top-level
- * group, so that group is reused rather than nested inside another one.
+ * `api.convertSVGToLayers` returns the wrapping group it makes *and* all of its
+ * descendants. When there is exactly one such root it is reused as the formula
+ * group (renamed in place), so the result is one folder -- not `name` wrapped
+ * around Cavalry's own "SVG Layer N".
  */
 function importSvgAsGroup(svg: string, name: string): string {
   // typst.ts's SVG needs flattening first; Cavalry's importer cannot resolve
@@ -40,21 +42,20 @@ function importSvgAsGroup(svg: string, name: string): string {
     throw new Error("SVG import produced no layers (file written, but convertSVGToLayers found nothing)");
   }
 
-  if (layerIds.length === 1) {
-    const groupId = layerIds[0];
-    api.rename(groupId, name);
-    return groupId;
+  const imported = new Set(layerIds);
+  const roots = layerIds.filter((id) => {
+    const parent = api.getParent(id);
+    return !parent || !imported.has(parent);
+  });
+
+  if (roots.length === 1) {
+    api.rename(roots[0], name);
+    return roots[0];
   }
 
   const groupId = api.create("group", name);
-  const imported = new Set(layerIds);
-  for (const id of layerIds) {
-    if (!api.layerExists(id)) {
-      continue;
-    }
-    // Only reparent the SVG's top-level layers; keep its internal hierarchy.
-    const parent = api.getParent(id);
-    if (!parent || !imported.has(parent)) {
+  for (const id of roots) {
+    if (api.layerExists(id)) {
       api.parent(id, groupId);
     }
   }
