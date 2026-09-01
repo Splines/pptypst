@@ -11,10 +11,11 @@
  * pure and knows nothing about Cavalry.
  */
 
-import { ASSET_FILES, DOCUMENT } from "./config.ts";
+import { ASSET_FILES, DOCUMENT, FONT_SIZE_REFERENCE } from "./config.ts";
+import { defaultFontSizePt } from "./core/font-size.ts";
 import { createAssetReader } from "./platform/files.ts";
 import { createPanel } from "./platform/panel.ts";
-import { findSelectedFormula, insertFormula } from "./platform/scene.ts";
+import { findSelectedFormula, getActiveCompHeightPx, insertFormula } from "./platform/scene.ts";
 import { createTypstEngine } from "./typst/engine.ts";
 
 /** How long the editor must be idle before the preview re-renders. */
@@ -34,7 +35,11 @@ const panel = createPanel({
   onSourceChanged: () => {
     schedulePreview();
   },
+  onFontSizeChanged: () => {
+    schedulePreview();
+  },
 });
+panel.setFontSizePt(defaultFontSizePt(getActiveCompHeightPx(), FONT_SIZE_REFERENCE));
 
 const engine = createTypstEngine({
   assets: createAssetReader(),
@@ -65,10 +70,12 @@ async function insert(): Promise<void> {
     ? editingLayerId
     : undefined;
 
+  const fontSizePt = panel.getFontSizePt();
+
   setBusy(true);
   try {
-    const svg = await engine.render(source);
-    editingLayerId = insertFormula({ source }, svg, replaces);
+    const svg = await engine.render(source, fontSizePt);
+    editingLayerId = insertFormula({ source, fontSizePt }, svg, replaces);
     panel.setEditing(true);
     panel.showPreview(svg);
     panel.setStatus(replaces ? "Updated formula." : "Inserted formula.");
@@ -111,6 +118,10 @@ function syncToSelection(): void {
   }
 
   editingLayerId = found.layerId;
+  // Older (v1) formulas didn't record a font size; fall back to the current
+  // resolution-scaled default rather than leaving the field stale.
+  const fontSizePt = found.formula.fontSizePt ?? defaultFontSizePt(getActiveCompHeightPx(), FONT_SIZE_REFERENCE);
+  panel.setFontSizePt(fontSizePt);
   panel.setSource(found.formula.source); // fires onSourceChanged -> schedulePreview
   panel.setEditing(true);
   panel.setStatus("Loaded formula from selection — Insert now updates it.");
@@ -155,7 +166,7 @@ async function refreshPreview(): Promise<void> {
 
   previewRendering = true;
   try {
-    const svg = await engine.render(source);
+    const svg = await engine.render(source, panel.getFontSizePt());
     panel.showPreview(svg);
   } catch (error) {
     panel.clearPreview();

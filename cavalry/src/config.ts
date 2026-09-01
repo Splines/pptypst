@@ -6,6 +6,7 @@
 
 import type { DocumentOptions } from "./core/typst-document.ts";
 import type { LayerNameOptions } from "./core/formula.ts";
+import type { FontSizeReference } from "./core/font-size.ts";
 
 /**
  * Where the vendored wasm modules and fonts live.
@@ -43,11 +44,22 @@ export const ASSET_FILES = {
   ],
 } as const;
 
-/** How the user's source is wrapped into a compilable Typst document. */
-export const DOCUMENT: DocumentOptions = {
-  fontSizePt: 28,
+/**
+ * How the user's source is wrapped into a compilable Typst document. Font
+ * size is not fixed here -- it comes from the panel's Size input, seeded per
+ * {@link FONT_SIZE_REFERENCE}.
+ */
+export const DOCUMENT: Omit<DocumentOptions, "fontSizePt"> = {
   mathMode: false,
 };
+
+/**
+ * Point size that looks right in a 2160-tall (4K) composition; the panel
+ * scales it for the active composition's actual resolution (see
+ * `core/font-size.ts`). Unlike the PowerPoint add-in's fixed 28pt, Cavalry
+ * scenes commonly run at 4K+, where 28pt reads as illegibly small.
+ */
+export const FONT_SIZE_REFERENCE: FontSizeReference = { pt: 150, heightPx: 2160 };
 
 /** How the group created for each formula is named. */
 export const LAYER_NAME: LayerNameOptions = {

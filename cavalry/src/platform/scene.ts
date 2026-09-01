@@ -25,6 +25,20 @@ export interface SceneFormula {
 const MAX_ANCESTOR_DEPTH = 32;
 
 /**
+ * The active composition's vertical resolution in pixels, or `0` if there is
+ * no active composition / the attribute can't be read. Used to scale the
+ * default formula font size to the scene (see `core/font-size.ts`).
+ */
+export function getActiveCompHeightPx(): number {
+  const compId = api.getActiveComp();
+  if (!compId) {
+    return 0;
+  }
+  const height = api.get(compId, "resolution.y");
+  return typeof height === "number" ? height : 0;
+}
+
+/**
  * Imports `svg` and returns the id of the single group holding the result.
  *
  * `api.convertSVGToLayers` returns the wrapping group it makes *and* all of its

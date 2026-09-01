@@ -52,13 +52,13 @@ export type ProgressListener = (message: string) => void;
 export interface TypstEngineOptions {
   assets: AssetReader;
   files: TypstAssetFiles;
-  document: DocumentOptions;
+  document: Omit<DocumentOptions, "fontSizePt">;
   onProgress?: ProgressListener;
 }
 
 export interface TypstEngine {
   /** Compiles Typst `source` to an SVG string, initialising on first use. */
-  render(source: string): Promise<string>;
+  render(source: string, fontSizePt: number): Promise<string>;
 }
 
 const MAIN_FILE = "/main.typ";
@@ -147,11 +147,11 @@ export function createTypstEngine(options: TypstEngineOptions): TypstEngine {
   }
 
   return {
-    async render(source: string): Promise<string> {
+    async render(source: string, fontSizePt: number): Promise<string> {
       await initOnce();
 
       report("compiling Typst ...");
-      compiler.addSource(MAIN_FILE, buildTypstDocument(source, document));
+      compiler.addSource(MAIN_FILE, buildTypstDocument(source, { ...document, fontSizePt }));
       const response = await compiler.compile({ mainFilePath: MAIN_FILE });
       const diagnostics: unknown = response.diagnostics;
       if (Array.isArray(diagnostics) && diagnostics.length > 0) {

@@ -9,22 +9,33 @@
  */
 
 /** Version stamped into every payload written to a layer. */
-export const FORMULA_VERSION = 1;
+export const FORMULA_VERSION = 2;
 
 /** What PPTypst knows about an inserted formula. */
 export interface Formula {
   /** The raw Typst the user typed, exactly as typed. */
   source: string;
+  /**
+   * Point size it was rendered at. `undefined` only for layers written by
+   * v1, before font size was tracked -- the caller decides what to show for
+   * those (see `defaultFontSizePt`).
+   */
+  fontSizePt?: number;
 }
 
 /** The on-layer representation. Kept structurally separate from {@link Formula}. */
 interface StoredFormula {
   v: number;
   code: string;
+  fontSize?: number;
 }
 
 export function serializeFormula(formula: Formula): unknown {
-  return { v: FORMULA_VERSION, code: formula.source } satisfies StoredFormula;
+  return {
+    v: FORMULA_VERSION,
+    code: formula.source,
+    fontSize: formula.fontSizePt,
+  } satisfies StoredFormula;
 }
 
 /**
@@ -36,11 +47,11 @@ export function parseFormula(raw: unknown): Formula | null {
   if (typeof raw !== "object" || raw === null) {
     return null;
   }
-  const { code } = raw as Partial<StoredFormula>;
+  const { code, fontSize } = raw as Partial<StoredFormula>;
   if (typeof code !== "string") {
     return null;
   }
-  return { source: code };
+  return { source: code, fontSizePt: typeof fontSize === "number" ? fontSize : undefined };
 }
 
 export interface LayerNameOptions {

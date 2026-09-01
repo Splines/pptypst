@@ -21,6 +21,38 @@ export interface PathVerb {
 
 const COORD_COUNT = new Map<string, number>([["M", 2], ["L", 2], ["C", 6], ["Q", 4], ["Z", 0]]);
 
+export interface BoundingBox {
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+}
+
+/**
+ * The tight box enclosing every coordinate across `verbs` (including curve
+ * control points, so it's a safe over-estimate rather than the true ink
+ * outline -- fine for fit-to-box scaling). `null` for an empty/`Z`-only input.
+ */
+export function boundingBox(verbs: readonly PathVerb[]): BoundingBox | null {
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+
+  for (const verb of verbs) {
+    for (let i = 0; i < verb.coords.length; i += 2) {
+      const x = verb.coords[i];
+      const y = verb.coords[i + 1];
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+    }
+  }
+
+  return Number.isFinite(minX) ? { minX, minY, maxX, maxY } : null;
+}
+
 export function parsePathData(d: string): PathVerb[] {
   const tokens = d.replace(/,/g, " ").split(/\s+/).filter(token => token.length > 0);
   const verbs: PathVerb[] = [];

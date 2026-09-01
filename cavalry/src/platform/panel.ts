@@ -3,8 +3,8 @@
  *
  * All `ui.*` construction lives here. The panel knows nothing about Typst or
  * the scene — it exposes a small view interface and calls back on user action,
- * so `main.ts` owns what actually happens. Adding controls (font size, colour)
- * means extending {@link Panel} and this file, not the orchestration.
+ * so `main.ts` owns what actually happens. Adding controls (e.g. colour) means
+ * extending {@link Panel} and this file, not the orchestration.
  */
 
 import { createPreview } from "./preview.ts";
@@ -21,12 +21,16 @@ export interface PanelHandlers {
   onSelectionChanged: () => void;
   /** The editor text changed; the app re-renders the live preview. */
   onSourceChanged: () => void;
+  /** The Size input changed; the app re-renders the live preview. */
+  onFontSizeChanged: () => void;
 }
 
 /** What the rest of the app may do to the panel. */
 export interface Panel {
   getSource: () => string;
   setSource: (source: string) => void;
+  getFontSizePt: () => number;
+  setFontSizePt: (fontSizePt: number) => void;
   setStatus: (message: string) => void;
   /** Disables the actions while a render is in flight. */
   setBusy: (busy: boolean) => void;
@@ -41,6 +45,9 @@ export interface Panel {
   clearPreview: () => void;
 }
 
+/** Matches the PowerPoint add-in's `<input id="fontSize" min="1" step="1.0">`. */
+const MIN_FONT_SIZE_PT = 1;
+
 export function createPanel(handlers: PanelHandlers): Panel {
   ui.setTitle("PPTypst");
 
@@ -50,6 +57,13 @@ export function createPanel(handlers: PanelHandlers): Panel {
   editor.setMinimumHeight(120);
 
   const preview = createPreview();
+
+  const fontSizeLabel = new ui.Label("Size");
+  const fontSizeField = new ui.NumericField(MIN_FONT_SIZE_PT);
+  fontSizeField.setType(0); // integer
+  fontSizeField.setMin(MIN_FONT_SIZE_PT);
+  fontSizeField.setStep(1);
+
   const insertButton = new ui.Button("Insert");
   const status = new ui.Label("Ready.");
 
@@ -58,6 +72,9 @@ export function createPanel(handlers: PanelHandlers): Panel {
   };
   editor.onValueChanged = () => {
     handlers.onSourceChanged();
+  };
+  fontSizeField.onValueChanged = () => {
+    handlers.onFontSizeChanged();
   };
 
   // Cavalry invokes this whenever the scene selection changes, letting the
@@ -68,8 +85,13 @@ export function createPanel(handlers: PanelHandlers): Panel {
     },
   });
 
+  const fontSizeRow = new ui.HLayout();
+  fontSizeRow.add(fontSizeLabel, fontSizeField);
+  fontSizeRow.addStretch();
+
   ui.add(editor);
   ui.add(preview.widget);
+  ui.add(fontSizeRow);
   ui.add(insertButton);
   ui.add(status);
   ui.addStretch();
@@ -90,6 +112,10 @@ export function createPanel(handlers: PanelHandlers): Panel {
     getSource: () => editor.getText().trim(),
     setSource: (source: string) => {
       editor.setText(source);
+    },
+    getFontSizePt: () => fontSizeField.getValue(),
+    setFontSizePt: (fontSizePt: number) => {
+      fontSizeField.setValue(fontSizePt);
     },
     setStatus: (message: string) => {
       status.setText(message);

@@ -11,8 +11,13 @@ import {
 const naming = { maxSourceChars: 20 };
 
 test("round-trips a formula through the stored payload", () => {
-  const formula = { source: "$ integral_0^1 x^2 dif x $" };
+  const formula = { source: "$ integral_0^1 x^2 dif x $", fontSizePt: 42 };
   assert.deepEqual(parseFormula(serializeFormula(formula)), formula);
+});
+
+test("reads a v1 payload (no font size) with fontSizePt left undefined", () => {
+  const parsed = parseFormula({ v: 1, code: "x^2" });
+  assert.deepEqual(parsed, { source: "x^2", fontSizePt: undefined });
 });
 
 test("stamps the payload with the format version", () => {

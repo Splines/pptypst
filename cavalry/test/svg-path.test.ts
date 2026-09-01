@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { parsePathData } from "../src/core/svg-path.ts";
+import { boundingBox, parsePathData } from "../src/core/svg-path.ts";
 import { flattenTypstSvg } from "../src/core/svg-flatten.ts";
 import { readFileSync } from "node:fs";
 
@@ -26,6 +26,16 @@ test("drops an unsupported verb and its orphaned numbers", () => {
 
 test("stops cleanly on a truncated tail", () => {
   assert.deepEqual(parsePathData("M 1 2 L 3"), [{ type: "M", coords: [1, 2] }]);
+});
+
+test("boundingBox spans every coordinate, including curve control points", () => {
+  const verbs = parsePathData("M 1 2 L 3 -4 C 5 6, -7 8, 9 10 Q -11 12, 13 14 Z");
+  assert.deepEqual(boundingBox(verbs), { minX: -11, minY: -4, maxX: 13, maxY: 14 });
+});
+
+test("boundingBox is null for verbs with no coordinates (e.g. just Z)", () => {
+  assert.equal(boundingBox(parsePathData("Z")), null);
+  assert.equal(boundingBox([]), null);
 });
 
 test("every path in the golden flattened fixture round-trips through the parser", () => {
