@@ -7,11 +7,15 @@
  * extending {@link Panel} and this file, not the orchestration.
  */
 
+import { createMathDelimiters } from "./math-delimiter.ts";
 import { createPreview } from "./preview.ts";
 import { createResizeGrip } from "./resize-grip.ts";
 import { createSizeField } from "./size-field.ts";
 
+/** Seeded into the editor and shown as the placeholder while "Only Math" is off. */
 const EXAMPLE_SOURCE = "$ integral_0^1 x^2 dif x = 1/3 $";
+/** Placeholder while "Only Math" is on: the `$ ... $` is added for the user. */
+const EXAMPLE_SOURCE_MATH = "integral_0^1 x^2 dif x = 1/3";
 
 /** Actions the panel reports; implemented by the composition root. */
 export interface PanelHandlers {
@@ -25,6 +29,11 @@ export interface PanelHandlers {
   onSourceChanged: () => void;
   /** The Size input changed; the app re-renders the live preview. */
   onFontSizeChanged: () => void;
+  /**
+   * The user toggled "Only Math". The app re-renders the preview and, when
+   * inserting a fresh formula, remembers the choice as a user preference.
+   */
+  onMathModeChanged: () => void;
 }
 
 /** What the rest of the app may do to the panel. */
@@ -33,6 +42,10 @@ export interface Panel {
   setSource: (source: string) => void;
   getFontSizePt: () => number;
   setFontSizePt: (fontSizePt: number) => void;
+  /** Whether "Only Math" is ticked, i.e. the source is wrapped in `$ ... $`. */
+  getMathMode: () => boolean;
+  /** Sets the "Only Math" tick and its editor cues without firing the handler. */
+  setMathMode: (mathMode: boolean) => void;
   setStatus: (message: string) => void;
   /** Disables the actions while a render is in flight. */
   setBusy: (busy: boolean) => void;
@@ -62,8 +75,39 @@ export function createPanel(handlers: PanelHandlers): Panel {
   ui.setTitle("PPTypst");
 
   const editor = new ui.MultiLineEdit();
-  editor.setPlaceholder(`Typst source, e.g.  ${EXAMPLE_SOURCE}`);
-  editor.setText(EXAMPLE_SOURCE);
+
+  const mathDelimiters = createMathDelimiters();
+
+  // The seeded example is only valid for one "Only Math" state (with the `$`
+  // for off, without for on). While the user hasn't touched it, swapping the
+  // toggle swaps the example too; once they type, we leave their text alone.
+  let editorHoldsExample = true;
+  // Set while `seedExample` calls `setText`, so the resulting `onValueChanged`
+  // is ignored: it isn't a user edit, and firing `onSourceChanged` from here
+  // can re-enter the app before its module finishes initialising.
+  let seedingExample = false;
+  const seedExample = (mathMode: boolean): void => {
+    seedingExample = true;
+    editor.setText(mathMode ? EXAMPLE_SOURCE_MATH : EXAMPLE_SOURCE);
+    seedingExample = false;
+  };
+
+  // Reflects "Only Math" into the editor: the bracketing "$" plates appear,
+  // and the placeholder switches to an example without the delimiters (the
+  // user types the maths, PPTypst adds the `$ ... $`).
+  const applyMathModeCues = (mathMode: boolean): void => {
+    mathDelimiters.setActive(mathMode);
+    editor.setPlaceholder(
+      mathMode
+        ? `Typst math, e.g.  ${EXAMPLE_SOURCE_MATH}`
+        : `Typst source, e.g.  ${EXAMPLE_SOURCE}`,
+    );
+    if (editorHoldsExample) {
+      seedExample(mathMode);
+    }
+  };
+
+  seedExample(false);
 
   // A grab bar under the editor: drags resize it, and pinning it to a fixed
   // height keeps it from stretching as the window grows taller.
@@ -85,6 +129,16 @@ export function createPanel(handlers: PanelHandlers): Panel {
     },
   });
 
+  // "Only Math" -- ticking it wraps the source in `$ ... $` before compiling,
+  // so the user writes plain maths. Mirrors the PowerPoint add-in's checkbox.
+  const mathModeCheckbox = new ui.Checkbox(false);
+  const mathModeLabel = new ui.Label("Only Math");
+  mathModeLabel.setToolTip("Wrap the source in display-math delimiters ($) before compiling");
+  mathModeCheckbox.onValueChanged = () => {
+    applyMathModeCues(mathModeCheckbox.getValue());
+    handlers.onMathModeChanged();
+  };
+
   const insertButton = new ui.Button("Insert");
   const status = new ui.Label("Ready.");
 
@@ -92,6 +146,10 @@ export function createPanel(handlers: PanelHandlers): Panel {
     handlers.onInsert();
   };
   editor.onValueChanged = () => {
+    if (seedingExample) {
+      return; // programmatic example swap, not a user edit
+    }
+    editorHoldsExample = false;
     handlers.onSourceChanged();
   };
 
@@ -105,11 +163,15 @@ export function createPanel(handlers: PanelHandlers): Panel {
 
   const fontSizeRow = new ui.HLayout();
   fontSizeRow.add(fontSizeField.widget);
+  fontSizeRow.addSpacing(10);
+  fontSizeRow.add(mathModeCheckbox, mathModeLabel);
   fontSizeRow.addStretch();
 
   ui.add(fontSizeRow);
+  ui.add(mathDelimiters.top);
   ui.add(editor);
   ui.add(editorGrip.widget);
+  ui.add(mathDelimiters.bottom);
   ui.add(preview.widget);
   ui.add(insertButton);
   ui.add(status);
@@ -129,6 +191,7 @@ export function createPanel(handlers: PanelHandlers): Panel {
   ui.show();
   preview.setWidth(panelWidth());
   editorGrip.setWidth(panelWidth());
+  applyMathModeCues(mathModeCheckbox.getValue());
 
   return {
     getSource: () => editor.getText().trim(),
@@ -138,6 +201,12 @@ export function createPanel(handlers: PanelHandlers): Panel {
     getFontSizePt: () => fontSizeField.getValue(),
     setFontSizePt: (fontSizePt: number) => {
       fontSizeField.setValue(fontSizePt);
+    },
+    getMathMode: () => mathModeCheckbox.getValue(),
+    setMathMode: (mathMode: boolean) => {
+      mathModeCheckbox.setValue(mathMode);
+      // `setValue` may not fire `onValueChanged`, so refresh the cues here.
+      applyMathModeCues(mathMode);
     },
     setStatus: (message: string) => {
       status.setText(message);

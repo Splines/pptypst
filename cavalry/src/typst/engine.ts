@@ -49,12 +49,13 @@ export interface TypstAssetFiles {
 export interface TypstEngineOptions {
   assets: AssetReader;
   files: TypstAssetFiles;
-  document: Omit<DocumentOptions, "fontSizePt">;
+  /** Font size and math mode are per-render (panel controls); see {@link TypstEngine.render}. */
+  document: Omit<DocumentOptions, "fontSizePt" | "mathMode">;
 }
 
 export interface TypstEngine {
   /** Compiles Typst `source` to an SVG string, initialising on first use. */
-  render(source: string, fontSizePt: number): Promise<string>;
+  render(source: string, fontSizePt: number, mathMode: boolean): Promise<string>;
 }
 
 const MAIN_FILE = "/main.typ";
@@ -125,12 +126,12 @@ export function createTypstEngine(options: TypstEngineOptions): TypstEngine {
   }
 
   return {
-    async render(source: string, fontSizePt: number): Promise<string> {
+    async render(source: string, fontSizePt: number, mathMode: boolean): Promise<string> {
       await initOnce();
 
       // Typst compiles + renders in well under a second, so there is no
       // progress to report here -- only failures surface, as thrown errors.
-      compiler.addSource(MAIN_FILE, buildTypstDocument(source, { ...document, fontSizePt }));
+      compiler.addSource(MAIN_FILE, buildTypstDocument(source, { ...document, fontSizePt, mathMode }));
       const response = await compiler.compile({ mainFilePath: MAIN_FILE });
       const diagnostics: unknown = response.diagnostics;
       if (Array.isArray(diagnostics) && diagnostics.length > 0) {

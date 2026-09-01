@@ -15,6 +15,7 @@ import { ASSET_FILES, DOCUMENT, FONT_SIZE_REFERENCE } from "./config.ts";
 import { defaultFontSizePt } from "./core/font-size.ts";
 import { createAssetReader } from "./platform/files.ts";
 import { createPanel } from "./platform/panel.ts";
+import { loadOnlyMathPreference, saveOnlyMathPreference } from "./platform/preferences.ts";
 import { findSelectedFormula, getActiveCompHeightPx, insertFormula } from "./platform/scene.ts";
 import { createTypstEngine } from "./typst/engine.ts";
 
@@ -38,8 +39,15 @@ const panel = createPanel({
   onFontSizeChanged: () => {
     schedulePreview();
   },
+  onMathModeChanged: () => {
+    // Only a fresh insert seeds the default; while editing a formula the tick
+    // belongs to that formula, not the global preference (mirrors PowerPoint).
+    if (editingLayerId === null) {
+      saveOnlyMathPreference(panel.getMathMode());
+    }
+    schedulePreview();
+  },
 });
-panel.setFontSizePt(defaultFontSizePt(getActiveCompHeightPx(), FONT_SIZE_REFERENCE));
 
 const engine = createTypstEngine({
   assets: createAssetReader(),
@@ -70,11 +78,12 @@ async function insert(): Promise<void> {
     : undefined;
 
   const fontSizePt = panel.getFontSizePt();
+  const mathMode = panel.getMathMode();
 
   setBusy(true);
   try {
-    const svg = await engine.render(source, fontSizePt);
-    editingLayerId = insertFormula({ source, fontSizePt }, svg, replaces);
+    const svg = await engine.render(source, fontSizePt, mathMode);
+    editingLayerId = insertFormula({ source, fontSizePt, mathMode }, svg, replaces);
     panel.setEditing(true);
     panel.showPreview(svg);
     panel.setStatus(replaces ? "Updated formula." : "Inserted formula.");
@@ -116,10 +125,8 @@ function syncToSelection(): void {
   }
 
   editingLayerId = found.layerId;
-  // Older (v1) formulas didn't record a font size; fall back to the current
-  // resolution-scaled default rather than leaving the field stale.
-  const fontSizePt = found.formula.fontSizePt ?? defaultFontSizePt(getActiveCompHeightPx(), FONT_SIZE_REFERENCE);
-  panel.setFontSizePt(fontSizePt);
+  panel.setFontSizePt(found.formula.fontSizePt);
+  panel.setMathMode(found.formula.mathMode);
   panel.setSource(found.formula.source); // fires onSourceChanged -> schedulePreview
   panel.setEditing(true);
 }
@@ -180,7 +187,7 @@ async function refreshPreview(): Promise<void> {
 
   previewRendering = true;
   try {
-    const svg = await engine.render(source, panel.getFontSizePt());
+    const svg = await engine.render(source, panel.getFontSizePt(), panel.getMathMode());
     panel.showPreview(svg);
     showCompileError(null);
   } catch (error) {
@@ -201,6 +208,11 @@ function setBusy(value: boolean): void {
   panel.setBusy(value);
 }
 
-// Reflect whatever happens to be selected, then preview the initial source.
+// Seed the panel's defaults for a fresh insert (a resolution-scaled font size
+// and the remembered "Only Math" choice), then let any current selection
+// override them, then preview the initial source. The seeding waits until here
+// so the callbacks it may trigger see a fully initialised module.
+panel.setFontSizePt(defaultFontSizePt(getActiveCompHeightPx(), FONT_SIZE_REFERENCE));
+panel.setMathMode(loadOnlyMathPreference());
 syncToSelection();
 schedulePreview();

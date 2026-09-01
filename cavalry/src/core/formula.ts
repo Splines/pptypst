@@ -2,32 +2,32 @@
  * The formula as PPTypst stores it on a Cavalry layer, and how that layer is
  * named.
  *
- * Everything about the persisted shape lives here so that adding per-formula
- * settings later (font size, colour, ...) is a contained change: bump
- * {@link FORMULA_VERSION}, extend {@link Formula}, and teach
- * {@link parseFormula} how to read the older shapes.
+ * Everything about the persisted shape lives here. The product has not
+ * shipped, so there is only one payload version and no back-compat handling:
+ * adding a per-formula setting means bumping {@link FORMULA_VERSION}, extending
+ * {@link Formula} / {@link StoredFormula}, and (until we ship) simply
+ * discarding anything written by an older version.
  */
 
 /** Version stamped into every payload written to a layer. */
-export const FORMULA_VERSION = 2;
+export const FORMULA_VERSION = 1;
 
 /** What PPTypst knows about an inserted formula. */
 export interface Formula {
   /** The raw Typst the user typed, exactly as typed. */
   source: string;
-  /**
-   * Point size it was rendered at. `undefined` only for layers written by
-   * v1, before font size was tracked -- the caller decides what to show for
-   * those (see `defaultFontSizePt`).
-   */
-  fontSizePt?: number;
+  /** Point size it was rendered at. */
+  fontSizePt: number;
+  /** Whether {@link source} was wrapped in `$ ... $` before compiling ("Only Math"). */
+  mathMode: boolean;
 }
 
 /** The on-layer representation. Kept structurally separate from {@link Formula}. */
 interface StoredFormula {
   v: number;
   code: string;
-  fontSize?: number;
+  fontSize: number;
+  math: boolean;
 }
 
 export function serializeFormula(formula: Formula): unknown {
@@ -35,23 +35,26 @@ export function serializeFormula(formula: Formula): unknown {
     v: FORMULA_VERSION,
     code: formula.source,
     fontSize: formula.fontSizePt,
+    math: formula.mathMode,
   } satisfies StoredFormula;
 }
 
 /**
  * Reads a payload previously written by {@link serializeFormula}. Returns
- * `null` for anything unrecognisable, so a layer carrying foreign or corrupt
- * user data is simply treated as "not a PPTypst formula".
+ * `null` for anything that isn't a current-version payload, so a layer
+ * carrying foreign, corrupt or older-version user data is simply treated as
+ * "not a PPTypst formula".
  */
 export function parseFormula(raw: unknown): Formula | null {
   if (typeof raw !== "object" || raw === null) {
     return null;
   }
-  const { code, fontSize } = raw as Partial<StoredFormula>;
-  if (typeof code !== "string") {
+  const { v, code, fontSize, math } = raw as Partial<StoredFormula>;
+  if (v !== FORMULA_VERSION || typeof code !== "string"
+    || typeof fontSize !== "number" || typeof math !== "boolean") {
     return null;
   }
-  return { source: code, fontSizePt: typeof fontSize === "number" ? fontSize : undefined };
+  return { source: code, fontSizePt: fontSize, mathMode: math };
 }
 
 export interface LayerNameOptions {
