@@ -199,8 +199,8 @@ function tidyShapeLayers(groupId: string): void {
  * When `replaceLayerId` refers to a layer that still exists it is deleted, so
  * editing a formula replaces it rather than stacking a copy on top, and the new
  * group is nudged so its centre lands on the old one's centre (mirrors the
- * PowerPoint add-in's `calculateCenteredPosition`). Rotation and scale are not
- * carried over.
+ * PowerPoint add-in's `calculateCenteredPosition`). The old group's rotation is
+ * carried over so a tilted formula stays tilted; scale is not.
  */
 export function insertFormula(formula: Formula, svg: string, replaceLayerId?: string): string {
   const name = formulaLayerName(formula.source, LAYER_NAME);
@@ -208,11 +208,18 @@ export function insertFormula(formula: Formula, svg: string, replaceLayerId?: st
   const toReplace = replaceLayerId !== undefined && api.layerExists(replaceLayerId)
     ? replaceLayerId
     : null;
-  // Capture the old formula's centre and expand/collapse state before it is
-  // deleted. A fresh insert starts collapsed (its glyph paths are Scene-window
-  // noise); an update keeps whatever state the user had the old group in.
+  // Capture the old formula's centre, rotation and expand/collapse state before
+  // it is deleted. A fresh insert starts collapsed (its glyph paths are
+  // Scene-window noise); an update keeps whatever state the user had the old
+  // group in, including any rotation they applied.
   const oldCentre = toReplace
     ? api.getBoundingBox(toReplace, true).centre
+    : null;
+  // `rotation` comes back as an `{ x, y, z }` object of degrees, not a bare
+  // number; read it as-is and pass it straight back to `api.set` so it
+  // round-trips whatever its shape.
+  const oldRotation = toReplace && api.hasAttribute(toReplace, "rotation")
+    ? api.get(toReplace, "rotation")
     : null;
   const expanded = toReplace ? api.get(toReplace, "hierarchy") === true : false;
 
@@ -225,6 +232,16 @@ export function insertFormula(formula: Formula, svg: string, replaceLayerId?: st
   api.set(groupId, { hierarchy: expanded });
   api.setUserData(groupId, USER_DATA_KEY, serializeFormula(formula));
   api.select([groupId]);
+
+  // Rotate before re-centring: the centre alignment below measures the new
+  // group's bounding box, which only matches the old one once it is tilted too.
+  if (oldRotation !== null && oldRotation !== undefined) {
+    try {
+      api.set(groupId, { rotation: oldRotation });
+    } catch (error) {
+      console.warn("[pptypst] could not carry rotation across update:", error);
+    }
+  }
 
   if (oldCentre) {
     // Both the bounding box and api.move work in scene units; move shifts the
