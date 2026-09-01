@@ -17,6 +17,7 @@ import { defaultFontSizePt } from "./core/font-size.ts";
 import { createAssetReader } from "./platform/files.ts";
 import { createPanel } from "./platform/panel.ts";
 import {
+  DEFAULT_ONLY_MATH,
   loadFillColorPreference,
   loadOnlyMathPreference,
   saveFillColorPreference,
@@ -35,6 +36,16 @@ const PREVIEW_DEBOUNCE_MS = 0;
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+/** Point size a fresh formula defaults to, scaled to the active composition. */
+function derivedFontSizePt(): number {
+  return defaultFontSizePt(getActiveCompHeightPx(), FONT_SIZE_REFERENCE);
+}
+
+/** Fill colour a fresh formula defaults to: contrast against the comp background. */
+function derivedFillColor(): string {
+  return contrastInk(getActiveCompBackgroundHex());
 }
 
 const panel = createPanel({
@@ -63,6 +74,20 @@ const panel = createPanel({
     // editing an existing formula does not.
     if (editingLayerId === null) {
       saveFillColorPreference(panel.getFillColor());
+    }
+    schedulePreview();
+  },
+  onReset: () => {
+    const color = derivedFillColor();
+    panel.setFontSizePt(derivedFontSizePt());
+    panel.setMathMode(DEFAULT_ONLY_MATH);
+    panel.setFillColor(color);
+    // Same rule as the Color and "Only Math" handlers: a fresh insert also
+    // forgets the remembered choices, while editing a formula leaves the
+    // global defaults alone (the reset only re-populates its fields).
+    if (editingLayerId === null) {
+      saveOnlyMathPreference(DEFAULT_ONLY_MATH);
+      saveFillColorPreference(color);
     }
     schedulePreview();
   },
@@ -237,8 +262,8 @@ function setBusy(value: boolean): void {
 // current selection override them, then preview the initial source. The
 // seeding waits until here so the callbacks it may trigger see a fully
 // initialised module.
-panel.setFontSizePt(defaultFontSizePt(getActiveCompHeightPx(), FONT_SIZE_REFERENCE));
+panel.setFontSizePt(derivedFontSizePt());
 panel.setMathMode(loadOnlyMathPreference());
-panel.setFillColor(loadFillColorPreference() ?? contrastInk(getActiveCompBackgroundHex()));
+panel.setFillColor(loadFillColorPreference() ?? derivedFillColor());
 syncToSelection();
 schedulePreview();

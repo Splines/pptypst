@@ -40,6 +40,13 @@ export interface PanelHandlers {
    * and, when inserting a fresh formula, remembers the colour as a preference.
    */
   onFillColorChanged: () => void;
+  /**
+   * The user clicked "Reset". The app restores the size, colour and "Only
+   * Math" tick to their derived defaults (font size from the composition
+   * height, colour from its background) and, for a fresh insert, forgets the
+   * remembered choices.
+   */
+  onReset: () => void;
 }
 
 /** What the rest of the app may do to the panel. */
@@ -188,6 +195,16 @@ export function createPanel(handlers: PanelHandlers): Panel {
     onMathModeToggled();
   };
 
+  // Sits next to "Only Math"; restores Size, Color and the tick to the
+  // defaults the app derives from the active composition.
+  const resetButton = new ui.Button("Reset");
+  resetButton.setFontSize(11);
+  resetButton.setFixedWidth(52);
+  resetButton.setToolTip("Reset Size, Color and “Only Math” to their defaults for this composition");
+  resetButton.onClick = () => {
+    handlers.onReset();
+  };
+
   const insertButton = new ui.Button("Insert");
   const status = new ui.Label("Ready.");
 
@@ -216,6 +233,8 @@ export function createPanel(handlers: PanelHandlers): Panel {
   fontSizeRow.add(colorField.widget);
   fontSizeRow.addSpacing(10);
   fontSizeRow.add(mathModeCheckbox, mathModeLabelBox);
+  fontSizeRow.addSpacing(10);
+  fontSizeRow.add(resetButton);
   fontSizeRow.addStretch();
 
   ui.add(fontSizeRow);
