@@ -11,17 +11,17 @@ import {
 const naming = { maxSourceChars: 20 };
 
 test("round-trips a formula through the stored payload", () => {
-  const formula = { source: "integral_0^1 x^2 dif x", fontSizePt: 42, mathMode: true };
+  const formula = { source: "integral_0^1 x^2 dif x", fontSizePt: 42, mathMode: true, color: "#ffffff" };
   assert.deepEqual(parseFormula(serializeFormula(formula)), formula);
 });
 
 test("round-trips a formula with 'Only Math' off", () => {
-  const formula = { source: "$ x $", fontSizePt: 28, mathMode: false };
+  const formula = { source: "$ x $", fontSizePt: 28, mathMode: false, color: "#1a1a1a" };
   assert.deepEqual(parseFormula(serializeFormula(formula)), formula);
 });
 
 test("stamps the payload with the format version", () => {
-  const stored = serializeFormula({ source: "x", fontSizePt: 28, mathMode: false });
+  const stored = serializeFormula({ source: "x", fontSizePt: 28, mathMode: false, color: "#000000" });
   assert.equal((stored as { v: number }).v, FORMULA_VERSION);
 });
 
@@ -34,10 +34,11 @@ test("rejects payloads that are not current-version PPTypst formulas", () => {
     {},
     { v: 1 },
     { code: 7 },
-    { v: 0, code: "x", fontSize: 28, math: false }, // older / unknown version
-    { v: 1, code: "x", math: false }, // missing font size
-    { v: 1, code: "x", fontSize: 28 }, // missing math flag
-    { v: 1, code: "x", fontSize: "28", math: false }, // wrong type
+    { v: 0, code: "x", fontSize: 28, math: false, color: "#000" }, // older / unknown version
+    { v: 1, code: "x", math: false, color: "#000" }, // missing font size
+    { v: 1, code: "x", fontSize: 28, color: "#000" }, // missing math flag
+    { v: 1, code: "x", fontSize: 28, math: false }, // missing colour
+    { v: 1, code: "x", fontSize: "28", math: false, color: "#000" }, // wrong type
   ];
   for (const raw of raws) {
     assert.equal(parseFormula(raw), null, JSON.stringify(raw));

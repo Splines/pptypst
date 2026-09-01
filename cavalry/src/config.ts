@@ -50,11 +50,12 @@ export const ASSET_FILES = {
 
 /**
  * How the user's source is wrapped into a compilable Typst document. Font
- * size and "Only Math" are not fixed here -- they come from the panel (the
- * Size input, seeded per {@link FONT_SIZE_REFERENCE}, and the "Only Math"
- * checkbox, seeded from the saved user preference).
+ * size, "Only Math" and the fill colour are not fixed here -- they all come
+ * from the panel (the Size input seeded per {@link FONT_SIZE_REFERENCE}, the
+ * "Only Math" checkbox and the Color chip, both seeded from saved preferences
+ * or the active composition).
  */
-export const DOCUMENT: Omit<DocumentOptions, "fontSizePt" | "mathMode"> = {};
+export const DOCUMENT: Omit<DocumentOptions, "fontSizePt" | "mathMode" | "color"> = {};
 
 /**
  * Point size that looks right in a 2160-tall (4K) composition; the panel

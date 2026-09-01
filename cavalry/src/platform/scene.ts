@@ -38,6 +38,35 @@ export function getActiveCompHeightPx(): number {
   return typeof height === "number" ? height : 0;
 }
 
+/** Attribute ids a composition might expose its background colour under. */
+const COMP_BACKGROUND_ATTRS = ["backgroundColor", "worldColor", "bgColor"];
+/** Matches the hex-string forms `api.get` returns a colour as. */
+const HEX_COLOR = /^#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
+
+/**
+ * The active composition's background colour as a hex string, or `null` when
+ * there is no active comp or the attribute can't be read. Used to seed a
+ * default ink that contrasts with the scene (see `core/contrast.ts`).
+ */
+export function getActiveCompBackgroundHex(): string | null {
+  const compId = api.getActiveComp();
+  if (!compId) {
+    return null;
+  }
+  for (const attr of COMP_BACKGROUND_ATTRS) {
+    let value: unknown;
+    try {
+      value = api.get(compId, attr);
+    } catch {
+      continue; // attribute doesn't exist on this build's comp -- try the next
+    }
+    if (typeof value === "string" && HEX_COLOR.test(value)) {
+      return value;
+    }
+  }
+  return null;
+}
+
 /**
  * Imports `svg` and returns the id of the single group holding the result.
  *

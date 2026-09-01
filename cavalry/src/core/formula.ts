@@ -20,6 +20,8 @@ export interface Formula {
   fontSizePt: number;
   /** Whether {@link source} was wrapped in `$ ... $` before compiling ("Only Math"). */
   mathMode: boolean;
+  /** Fill colour it was rendered with, as a hex string like "#ffffff". */
+  color: string;
 }
 
 /** The on-layer representation. Kept structurally separate from {@link Formula}. */
@@ -28,6 +30,7 @@ interface StoredFormula {
   code: string;
   fontSize: number;
   math: boolean;
+  color: string;
 }
 
 export function serializeFormula(formula: Formula): unknown {
@@ -36,6 +39,7 @@ export function serializeFormula(formula: Formula): unknown {
     code: formula.source,
     fontSize: formula.fontSizePt,
     math: formula.mathMode,
+    color: formula.color,
   } satisfies StoredFormula;
 }
 
@@ -49,12 +53,13 @@ export function parseFormula(raw: unknown): Formula | null {
   if (typeof raw !== "object" || raw === null) {
     return null;
   }
-  const { v, code, fontSize, math } = raw as Partial<StoredFormula>;
+  const { v, code, fontSize, math, color } = raw as Partial<StoredFormula>;
   if (v !== FORMULA_VERSION || typeof code !== "string"
-    || typeof fontSize !== "number" || typeof math !== "boolean") {
+    || typeof fontSize !== "number" || typeof math !== "boolean"
+    || typeof color !== "string") {
     return null;
   }
-  return { source: code, fontSizePt: fontSize, mathMode: math };
+  return { source: code, fontSizePt: fontSize, mathMode: math, color };
 }
 
 export interface LayerNameOptions {

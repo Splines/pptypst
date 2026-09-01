@@ -7,6 +7,7 @@
  * extending {@link Panel} and this file, not the orchestration.
  */
 
+import { createColorField } from "./color-field.ts";
 import { createMathDelimiters } from "./math-delimiter.ts";
 import { createPreview } from "./preview.ts";
 import { createResizeGrip } from "./resize-grip.ts";
@@ -34,6 +35,11 @@ export interface PanelHandlers {
    * inserting a fresh formula, remembers the choice as a user preference.
    */
   onMathModeChanged: () => void;
+  /**
+   * The user picked a different fill colour. The app re-renders the preview
+   * and, when inserting a fresh formula, remembers the colour as a preference.
+   */
+  onFillColorChanged: () => void;
 }
 
 /** What the rest of the app may do to the panel. */
@@ -46,6 +52,10 @@ export interface Panel {
   getMathMode: () => boolean;
   /** Sets the "Only Math" tick and its editor cues without firing the handler. */
   setMathMode: (mathMode: boolean) => void;
+  /** The chosen fill colour as a hex string. */
+  getFillColor: () => string;
+  /** Sets the Color chip without firing the handler. */
+  setFillColor: (hex: string) => void;
   setStatus: (message: string) => void;
   /** Disables the actions while a render is in flight. */
   setBusy: (busy: boolean) => void;
@@ -141,6 +151,17 @@ export function createPanel(handlers: PanelHandlers): Panel {
     },
   });
 
+  // Fill colour for the inserted formula (not the preview strip, which stays a
+  // fixed white-on-black readability check). The real default is seeded by the
+  // app from the saved preference or the composition background.
+  const colorField = createColorField({
+    label: "Color",
+    value: "#ffffff",
+    onChange: () => {
+      handlers.onFillColorChanged();
+    },
+  });
+
   // "Only Math" -- ticking it wraps the source in `$ ... $` before compiling,
   // so the user writes plain maths. Mirrors the PowerPoint add-in's checkbox.
   const mathModeCheckbox = new ui.Checkbox(false);
@@ -191,6 +212,8 @@ export function createPanel(handlers: PanelHandlers): Panel {
 
   const fontSizeRow = new ui.HLayout();
   fontSizeRow.add(fontSizeField.widget);
+  fontSizeRow.addSpacing(6);
+  fontSizeRow.add(colorField.widget);
   fontSizeRow.addSpacing(10);
   fontSizeRow.add(mathModeCheckbox, mathModeLabelBox);
   fontSizeRow.addStretch();
@@ -236,6 +259,10 @@ export function createPanel(handlers: PanelHandlers): Panel {
       mathModeCheckbox.setValue(mathMode);
       // `setValue` may not fire `onValueChanged`, so refresh the cues here.
       applyMathModeCues(mathMode);
+    },
+    getFillColor: () => colorField.getValue(),
+    setFillColor: (hex: string) => {
+      colorField.setValue(hex);
     },
     setStatus: (message: string) => {
       status.setText(message);

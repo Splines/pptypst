@@ -12,11 +12,22 @@
  */
 
 import { ASSET_FILES, DOCUMENT, FONT_SIZE_REFERENCE } from "./config.ts";
+import { contrastInk } from "./core/contrast.ts";
 import { defaultFontSizePt } from "./core/font-size.ts";
 import { createAssetReader } from "./platform/files.ts";
 import { createPanel } from "./platform/panel.ts";
-import { loadOnlyMathPreference, saveOnlyMathPreference } from "./platform/preferences.ts";
-import { findSelectedFormula, getActiveCompHeightPx, insertFormula } from "./platform/scene.ts";
+import {
+  loadFillColorPreference,
+  loadOnlyMathPreference,
+  saveFillColorPreference,
+  saveOnlyMathPreference,
+} from "./platform/preferences.ts";
+import {
+  findSelectedFormula,
+  getActiveCompBackgroundHex,
+  getActiveCompHeightPx,
+  insertFormula,
+} from "./platform/scene.ts";
 import { createTypstEngine } from "./typst/engine.ts";
 
 /** How long the editor must be idle before the preview re-renders. */
@@ -44,6 +55,14 @@ const panel = createPanel({
     // belongs to that formula, not the global preference (mirrors PowerPoint).
     if (editingLayerId === null) {
       saveOnlyMathPreference(panel.getMathMode());
+    }
+    schedulePreview();
+  },
+  onFillColorChanged: () => {
+    // Same rule as "Only Math": a fresh insert updates the remembered default,
+    // editing an existing formula does not.
+    if (editingLayerId === null) {
+      saveFillColorPreference(panel.getFillColor());
     }
     schedulePreview();
   },
@@ -79,11 +98,12 @@ async function insert(): Promise<void> {
 
   const fontSizePt = panel.getFontSizePt();
   const mathMode = panel.getMathMode();
+  const color = panel.getFillColor();
 
   setBusy(true);
   try {
-    const svg = await engine.render(source, fontSizePt, mathMode);
-    editingLayerId = insertFormula({ source, fontSizePt, mathMode }, svg, replaces);
+    const svg = await engine.render(source, fontSizePt, mathMode, color);
+    editingLayerId = insertFormula({ source, fontSizePt, mathMode, color }, svg, replaces);
     panel.setEditing(true);
     panel.showPreview(svg);
     panel.setStatus(replaces ? "Updated formula." : "Inserted formula.");
@@ -127,6 +147,7 @@ function syncToSelection(): void {
   editingLayerId = found.layerId;
   panel.setFontSizePt(found.formula.fontSizePt);
   panel.setMathMode(found.formula.mathMode);
+  panel.setFillColor(found.formula.color);
   panel.setSource(found.formula.source); // fires onSourceChanged -> schedulePreview
   panel.setEditing(true);
 }
@@ -187,7 +208,9 @@ async function refreshPreview(): Promise<void> {
 
   previewRendering = true;
   try {
-    const svg = await engine.render(source, panel.getFontSizePt(), panel.getMathMode());
+    const svg = await engine.render(
+      source, panel.getFontSizePt(), panel.getMathMode(), panel.getFillColor(),
+    );
     panel.showPreview(svg);
     showCompileError(null);
   } catch (error) {
@@ -208,11 +231,14 @@ function setBusy(value: boolean): void {
   panel.setBusy(value);
 }
 
-// Seed the panel's defaults for a fresh insert (a resolution-scaled font size
-// and the remembered "Only Math" choice), then let any current selection
-// override them, then preview the initial source. The seeding waits until here
-// so the callbacks it may trigger see a fully initialised module.
+// Seed the panel's defaults for a fresh insert (a resolution-scaled font size,
+// the remembered "Only Math" choice, and a fill colour -- the saved one, or
+// one that contrasts with the active composition's background), then let any
+// current selection override them, then preview the initial source. The
+// seeding waits until here so the callbacks it may trigger see a fully
+// initialised module.
 panel.setFontSizePt(defaultFontSizePt(getActiveCompHeightPx(), FONT_SIZE_REFERENCE));
 panel.setMathMode(loadOnlyMathPreference());
+panel.setFillColor(loadFillColorPreference() ?? contrastInk(getActiveCompBackgroundHex()));
 syncToSelection();
 schedulePreview();
