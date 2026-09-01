@@ -68,18 +68,23 @@ export function createPanel(handlers: PanelHandlers): Panel {
     },
   });
 
-  const previewRow = new ui.HLayout();
-  previewRow.addStretch();
-  previewRow.add(preview.widget);
-  previewRow.addStretch();
-
   ui.add(editor);
-  ui.add(previewRow);
+  ui.add(preview.widget);
   ui.add(insertButton);
   ui.add(status);
   ui.addStretch();
   ui.setMinimumWidth(360);
+
+  // Keep the preview strip spanning the panel as it is resized. The default
+  // layout margin is 3px a side, so the usable content width is 6px short.
+  // `ui.size()` is typed `unknown` by the Cavalry types.
+  const panelWidth = (): number => (ui.size() as { width: number }).width - 6;
+  ui.onResize = () => {
+    preview.setWidth(panelWidth());
+  };
+
   ui.show();
+  preview.setWidth(panelWidth());
 
   return {
     getSource: () => editor.getText().trim(),
