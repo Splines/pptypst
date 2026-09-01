@@ -69,7 +69,16 @@ const MAX_FONT_SIZE_PT = 1000;
 const EDITOR_DEFAULT_HEIGHT = 60;
 /** How far the grip may shrink / grow the editor, in pixels. */
 const EDITOR_MIN_HEIGHT = 45;
-const EDITOR_MAX_HEIGHT = 600;
+const EDITOR_MAX_HEIGHT = 280;
+
+/**
+ * Height cap for the whole window, in pixels. Cavalry has no "open at this
+ * size" API -- only min/max/fixed -- and a script window otherwise opens
+ * taller than its content, leaving dead space under the status line. Capping
+ * the height makes the first open snug while still letting the user drag it
+ * shorter (and a little taller, up to this, for the editor grip's range).
+ */
+const MAX_WINDOW_HEIGHT = 680;
 /** Editor text size, in pixels; the toolkit default is too small to read comfortably. */
 const EDITOR_FONT_SIZE_PX = 18;
 
@@ -196,6 +205,7 @@ export function createPanel(handlers: PanelHandlers): Panel {
   ui.add(status);
   ui.addStretch();
   ui.setMinimumWidth(360);
+  ui.setMaximumHeight(MAX_WINDOW_HEIGHT);
 
   // Keep the preview strip spanning the panel as it is resized. The default
   // layout margin is 3px a side, so the usable content width is 6px short.
