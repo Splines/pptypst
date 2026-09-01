@@ -7,6 +7,8 @@
  * means extending {@link Panel} and this file, not the orchestration.
  */
 
+import { createPreview } from "./preview.ts";
+
 const EXAMPLE_SOURCE = "$ integral_0^1 x^2 dif x = 1/3 $";
 
 /** Actions the panel reports; implemented by the composition root. */
@@ -17,6 +19,8 @@ export interface PanelHandlers {
    * the app inspects the scene and calls back with {@link Panel.setEditing}.
    */
   onSelectionChanged: () => void;
+  /** The editor text changed; the app re-renders the live preview. */
+  onSourceChanged: () => void;
 }
 
 /** What the rest of the app may do to the panel. */
@@ -31,6 +35,10 @@ export interface Panel {
    * and replacing the one currently selected in the scene ("Update").
    */
   setEditing: (editing: boolean) => void;
+  /** Repaints the live preview from raw typst.ts SVG. */
+  showPreview: (svg: string) => void;
+  /** Clears the live preview. */
+  clearPreview: () => void;
 }
 
 export function createPanel(handlers: PanelHandlers): Panel {
@@ -41,11 +49,15 @@ export function createPanel(handlers: PanelHandlers): Panel {
   editor.setText(EXAMPLE_SOURCE);
   editor.setMinimumHeight(120);
 
+  const preview = createPreview();
   const insertButton = new ui.Button("Insert");
   const status = new ui.Label("Ready.");
 
   insertButton.onClick = () => {
     handlers.onInsert();
+  };
+  editor.onValueChanged = () => {
+    handlers.onSourceChanged();
   };
 
   // Cavalry invokes this whenever the scene selection changes, letting the
@@ -56,7 +68,13 @@ export function createPanel(handlers: PanelHandlers): Panel {
     },
   });
 
+  const previewRow = new ui.HLayout();
+  previewRow.addStretch();
+  previewRow.add(preview.widget);
+  previewRow.addStretch();
+
   ui.add(editor);
+  ui.add(previewRow);
   ui.add(insertButton);
   ui.add(status);
   ui.addStretch();
@@ -77,5 +95,7 @@ export function createPanel(handlers: PanelHandlers): Panel {
     setEditing: (editing: boolean) => {
       insertButton.setText(editing ? "Update" : "Insert");
     },
+    showPreview: preview.show,
+    clearPreview: preview.clear,
   };
 }

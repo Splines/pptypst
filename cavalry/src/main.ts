@@ -17,6 +17,9 @@ import { createPanel } from "./platform/panel.ts";
 import { findSelectedFormula, insertFormula } from "./platform/scene.ts";
 import { createTypstEngine } from "./typst/engine.ts";
 
+/** How long the editor must be idle before the preview re-renders. */
+const PREVIEW_DEBOUNCE_MS = 0;
+
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
@@ -27,6 +30,9 @@ const panel = createPanel({
   },
   onSelectionChanged: () => {
     syncToSelection();
+  },
+  onSourceChanged: () => {
+    schedulePreview();
   },
 });
 
@@ -41,9 +47,9 @@ const engine = createTypstEngine({
 let editingLayerId: string | null = null;
 
 /**
- * True while a render is in flight. Selection sync is paused for the duration
- * so a click in the scene can't swap the editor source out from under an
- * insert that is already using the text captured when it started.
+ * True while an insert render is in flight. The preview yields to it (they share
+ * the single engine) and selection sync is paused, so a click in the scene
+ * can't swap the editor source out from under the insert.
  */
 let busy = false;
 
@@ -64,12 +70,14 @@ async function insert(): Promise<void> {
     const svg = await engine.render(source);
     editingLayerId = insertFormula({ source }, svg, replaces);
     panel.setEditing(true);
+    panel.showPreview(svg);
     panel.setStatus(replaces ? "Updated formula." : "Inserted formula.");
   } catch (error) {
     console.error("[pptypst] insert failed:", error);
     panel.setStatus(`Failed: ${errorMessage(error)}`);
   } finally {
     setBusy(false);
+    void refreshPreview(); // catch up if the text changed mid-insert
   }
 }
 
@@ -103,9 +111,62 @@ function syncToSelection(): void {
   }
 
   editingLayerId = found.layerId;
-  panel.setSource(found.formula.source);
+  panel.setSource(found.formula.source); // fires onSourceChanged -> schedulePreview
   panel.setEditing(true);
   panel.setStatus("Loaded formula from selection — Insert now updates it.");
+}
+
+/* -------------------------------------------------------------------------- */
+/* Live preview                                                              */
+/* -------------------------------------------------------------------------- */
+
+const previewTimer = new api.Timer({
+  onTimeout: () => {
+    void refreshPreview();
+  },
+});
+previewTimer.setRepeating(false);
+previewTimer.setInterval(PREVIEW_DEBOUNCE_MS);
+
+/** A render is running; keeps the single engine from being entered twice. */
+let previewRendering = false;
+/** The source changed again while a render was running -- re-run when it ends. */
+let previewStale = false;
+
+function schedulePreview(): void {
+  previewTimer.stop();
+  previewTimer.start();
+}
+
+async function refreshPreview(): Promise<void> {
+  if (busy) {
+    return; // an insert render is using the engine; its finally re-runs us
+  }
+  if (previewRendering) {
+    previewStale = true;
+    return;
+  }
+
+  const source = panel.getSource();
+  if (!source) {
+    panel.clearPreview();
+    return;
+  }
+
+  previewRendering = true;
+  try {
+    const svg = await engine.render(source);
+    panel.showPreview(svg);
+  } catch (error) {
+    panel.clearPreview();
+    console.debug("[pptypst] preview render failed:", errorMessage(error));
+  } finally {
+    previewRendering = false;
+    if (previewStale) {
+      previewStale = false;
+      void refreshPreview();
+    }
+  }
 }
 
 function setBusy(value: boolean): void {
@@ -113,5 +174,6 @@ function setBusy(value: boolean): void {
   panel.setBusy(value);
 }
 
-// Reflect whatever happens to be selected when the panel opens.
+// Reflect whatever happens to be selected, then preview the initial source.
 syncToSelection();
+schedulePreview();

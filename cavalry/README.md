@@ -3,12 +3,13 @@
 Brings PPTypst's "type Typst → get vector paths" workflow into the
 [Cavalry](https://cavalry.studio) animation app as a pasteable script.
 
-A small window with a Typst editor and one action button. **Insert** compiles the
-Typst to SVG and imports it as vector layers grouped under `PPTypst: <formula>`,
-storing the raw source on the group. Selecting such a group in the scene loads
-its source back into the editor and turns the button into **Update**, which
-replaces that formula in place; with nothing PPTypst selected the button reverts
-to **Insert** and creates a fresh group.
+A small window with a Typst editor, a live preview that re-renders as you type,
+and one action button. **Insert** compiles the Typst to SVG and imports it as
+vector layers grouped under `PPTypst: <formula>`, storing the raw source on the
+group. Selecting such a group in the scene loads its source back into the editor
+and turns the button into **Update**, which replaces that formula in place (the
+new group re-centred on the old one's centre); with nothing PPTypst selected the
+button reverts to **Insert** and creates a fresh group.
 
 ## Setup
 
@@ -49,11 +50,13 @@ src/
     base64.ts           base64 → bytes (Cavalry has no atob)
     formula.ts          what a formula is, how it is stored, how it is named
     svg-flatten.ts      typst.ts SVG → SVG that Cavalry can import
+    svg-path.ts         normalized path `d` string → structured verbs
     typst-document.ts   wraps the user's source into a compilable document
 
   platform/             Cavalry adapter — all api.*/ui.* access lives here
     files.ts            asset directory resolution, binary reads, temp files
     panel.ts            the window: widgets, layout, wording
+    preview.ts          the live preview swatch (ui.Draw + cavalry.Path)
     scene.ts            SVG → named, tagged group; finding it again
 
   typst/
@@ -81,6 +84,15 @@ built for that — content came out collapsed onto one point and mirrored.
 `flattenSvg` resolves every `<use>`, composes the whole ancestor-transform chain
 into a single matrix per glyph, and bakes it into that glyph's path coordinates,
 emitting one flat top-level `<path>` per glyph or shape.
+
+### Why the preview uses `ui.Draw`
+
+Cavalry's UI has no SVG widget. `ui.Draw` paints `cavalry.Path`s, so the live
+preview reuses `flattenTypstSvg` to get already-transformed `d` strings,
+`svg-path.ts` to turn each into verbs, and replays them onto a `cavalry.Path`
+scaled to fit the swatch. No scene layers, no temp files — it renders straight
+from the compiled SVG on every keystroke (debounced), sharing the one Typst
+engine with **Insert**.
 
 ## Development
 
