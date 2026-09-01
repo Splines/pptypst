@@ -1,0 +1,21 @@
+[
+    {
+        "author": "pptypst",
+        "type": "pptypst",
+        "superType": "thirdPartyJavaScript",
+        "jsFile": "node.js",
+        "version": "1.0",
+        "attributes": {
+            "version": {
+                "type": "double",
+                "default": 1.0
+            }
+        },
+        "triggers": {
+            "out": ["version"]
+        },
+        "UI": {
+            "attributeOrder": ["version"]
+        }
+    }
+]

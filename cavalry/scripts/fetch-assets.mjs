@@ -98,7 +98,8 @@ async function main() {
   }
 
   console.log(`\nAssets ready in ${vendorDir}`);
-  console.log("Set ASSET_DIR in src/config.ts to that absolute path, then `npm run build`.");
+  console.log("Next: `npm run build && npm run pack` (or `npm run setup`).");
+  console.log("For JS-Editor testing: `PPTYPST_ASSET_DIR=\"<abs path above>\" npm run build`.");
 }
 
 main().catch((err) => {

@@ -1,0 +1,18 @@
+[
+    {
+        "type": "layerStrings",
+        "value": {
+            "author": "pptypst",
+            "layerType": "pptypst",
+            "niceName": "PPTypst",
+            "layerInfo": "Opens the PPTypst window (also under Window ▸ Scripts ▸ PPTypst), where you typeset Typst into vector layers. This node itself outputs nothing useful — it only exists so the plug-in can register and give you a launch point.",
+            "language": "en",
+            "attributes": {
+                "version": [
+                    "Version",
+                    "The installed PPTypst plug-in version. Informational only."
+                ]
+            }
+        }
+    }
+]

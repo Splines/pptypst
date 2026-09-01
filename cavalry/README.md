@@ -1,7 +1,8 @@
 # PPTypst for Cavalry
 
 Brings PPTypst's "type Typst → get vector paths" workflow into the
-[Cavalry](https://cavalry.studio) animation app as a pasteable script.
+[Cavalry](https://cavalry.studio) animation app, installed by dragging one zip
+onto the Cavalry window.
 
 A small window with a Typst editor, a live preview that re-renders as you type,
 and one action button. **Insert** compiles the Typst to SVG and imports it as
@@ -11,28 +12,53 @@ and turns the button into **Update**, which replaces that formula in place (the
 new group re-centred on the old one's centre); with nothing PPTypst selected the
 button reverts to **Insert** and creates a fresh group.
 
-## Setup
+## Build
 
 ```bash
 cd cavalry
 npm install
-npm run assets      # fills assets/vendor/ with the wasm modules + fonts (~35 MB)
-npm run build       # -> dist/pptypst-cavalry.js
+npm run setup       # assets + build + pack, in one go
 ```
 
-The wasm modules and fonts are far too large to embed in a pasted script, so
-they live on disk and the script reads them at runtime. Point it at them one of
-two ways:
+`npm run setup` runs three steps (also available individually):
 
-- **Installed script** (recommended): copy `assets/vendor/` to
-  `<Cavalry Scripts>/pptypst_assets/vendor/` and `dist/pptypst-cavalry.js` to
-  `<Cavalry Scripts>/`, then run it from the Scripts menu. This is Cavalry's
-  own `_assets` convention and needs no configuration.
-- **JavaScript Editor**: `ui.scriptLocation` is blank when pasting, so set
-  `ASSET_DIR_OVERRIDE` in [`src/config.ts`](src/config.ts) to the absolute path
-  of the vendor folder and rebuild.
+| step            | output                                                              |
+| --------------- | ------------------------------------------------------------------ |
+| `npm run assets` | `assets/vendor/` — the two wasm modules + 12 fonts (~35 MB)        |
+| `npm run build`  | `dist/pptypst-cavalry.js` — the window script, one minified IIFE   |
+| `npm run pack`   | `dist/PPTypst/` and `dist/PPTypst.zip` — the installable plug-in   |
 
-Then paste or open the script and click **Insert**.
+## Install
+
+The wasm modules and fonts are far too large to embed in the script, so the
+plug-in carries them and drops everything into place on install:
+
+1. Drag **`dist/PPTypst.zip`** (or the `dist/PPTypst/` folder) onto an open
+   Cavalry window and confirm the dialog.
+2. The plug-in copies `PPTypst.js` and `pptypst_assets/vendor/` into your
+   Cavalry **Scripts** folder ([`plugin/welcome.js`](plugin/welcome.js)), then
+   shows a splash.
+3. Open **Window ▸ Scripts ▸ PPTypst**, type some Typst, and click **Insert**.
+
+Cavalry only accepts a plug-in that registers at least one layer, so the plug-in
+adds one inert **PPTypst** utility node ([`plugin/`](plugin/)): it outputs
+nothing useful and exists only so the plug-in is valid and so **Add ▸ PPTypst**
+can double as a launch point — creating it runs the window script
+([`plugin/setup.js`](plugin/setup.js)). Re-dragging the zip updates the files in
+place.
+
+### JavaScript-Editor dev loop
+
+`ui.scriptLocation` is blank when a script is pasted rather than run from the
+Scripts menu, so the asset directory has to be baked in:
+
+```bash
+PPTYPST_ASSET_DIR="C:/Users/<you>/AppData/Roaming/Cavalry/Scripts/pptypst_assets/vendor" npm run build
+```
+
+Then paste `dist/pptypst-cavalry.js` into the JavaScript Editor. A normal
+`npm run build` leaves the path empty, which is what the shipped plug-in wants:
+the script then falls back to `<script folder>/pptypst_assets/vendor`.
 
 ## Architecture
 
@@ -108,7 +134,9 @@ inside Cavalry before it ships.
 
 ## Known limitations
 
-- The pasted script is not self-contained; it needs `assets/vendor/` on disk.
+- The script is not self-contained; it reads `pptypst_assets/vendor/` from next
+  to itself at runtime. The plug-in puts it there on install; the drag-install
+  step (`plugin/welcome.js`) is unverified against a live Cavalry build.
 - Typst package imports (`#import "@preview/…"`) are unsupported (no registry).
 - Updating a formula deletes and recreates it. The new group is re-centred on
   the old one's centre, but its rotation and scale are not carried over.

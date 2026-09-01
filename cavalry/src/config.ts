@@ -11,13 +11,17 @@ import type { FontSizeReference } from "./core/font-size.ts";
 /**
  * Where the vendored wasm modules and fonts live.
  *
- * Leave empty to use the Cavalry convention: a `pptypst_assets/vendor` folder
- * next to the installed script (`<Cavalry Scripts>/pptypst_assets/vendor`).
- * That only works when the script is run from the Scripts menu — `ui.scriptLocation`
- * is blank when pasting into the JavaScript Editor — so set an absolute path
- * here for editor-based testing.
+ * Baked in at build time from the `PPTYPST_ASSET_DIR` env var (see
+ * `vite.config.ts`). Empty in a shipped build, which makes the script fall back
+ * to the Cavalry convention: a `pptypst_assets/vendor` folder next to the
+ * installed script (`<Cavalry Scripts>/pptypst_assets/vendor`). That convention
+ * only works when the script is run from the Scripts menu — `ui.scriptLocation`
+ * is blank when pasting into the JavaScript Editor — so for editor testing
+ * build with `PPTYPST_ASSET_DIR=/abs/path/to/vendor npm run build`.
  */
-export const ASSET_DIR_OVERRIDE: string = "C:/Users/domin/AppData/Roaming/Cavalry/Scripts/pptypst_assets/vendor";
+declare const __ASSET_DIR_OVERRIDE__: string | undefined;
+export const ASSET_DIR_OVERRIDE: string
+  = typeof __ASSET_DIR_OVERRIDE__ === "string" ? __ASSET_DIR_OVERRIDE__ : "";
 
 /** Folder name looked for next to an installed script when no override is set. */
 export const ASSET_DIR_CONVENTION = "pptypst_assets/vendor";

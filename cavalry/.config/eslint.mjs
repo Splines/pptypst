@@ -76,8 +76,21 @@ export default defineConfig([
     },
   },
   {
-    // Build tooling: plain Node ESM, no type-checked linting.
-    files: ["build.mjs", "scripts/**/*.mjs"],
+    // Vite config: Node ESM in TypeScript, but outside the project tsconfig.
+    files: ["vite.config.ts"],
+    plugins: { "@stylistic": stylistic },
+    extends: [eslint.configs.recommended, tseslint.configs.recommended, tseslint.configs.disableTypeChecked],
+    rules: style,
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: "module",
+      globals: { ...globals.node },
+    },
+  },
+  {
+    // Build tooling and the plug-in's own install script: plain Node/Cavalry
+    // JS, no type-checked linting.
+    files: ["scripts/**/*.mjs", "plugin/**/*.js"],
     extends: [tseslint.configs.disableTypeChecked],
     languageOptions: {
       ecmaVersion: 2022,
