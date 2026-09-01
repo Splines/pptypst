@@ -12,9 +12,12 @@
 /** Field background and grey caption ink, to sit on Cavalry's dark interface. */
 const FIELD_BG = "#2d2d2d";
 const CAPTION_INK = "#8a8a8a";
-/** Corner rounding and row height, in pixels, to match native fields. */
+/** Corner rounding and pill size, in pixels, to match native fields. */
 const RADIUS = 3;
 const HEIGHT = 22;
+const WIDTH = 84;
+/** Caption column width; the number sits to its right at a fixed gap. */
+const CAPTION_WIDTH = 32;
 
 export interface SizeFieldOptions {
   /** Caption shown in grey on the left, e.g. "Size". */
@@ -48,17 +51,19 @@ export function createSizeField(options: SizeFieldOptions): SizeField {
 
   const caption = new ui.Label(options.label);
   caption.setTextColor(CAPTION_INK);
+  caption.setFixedWidth(CAPTION_WIDTH);
 
   const row = new ui.HLayout();
   row.setMargins(7, 0, 3, 0);
   row.setSpaceBetween(4);
   row.add(caption, field);
+  row.addStretch();
 
   const container = new ui.Container();
   container.setBackgroundColor(FIELD_BG);
   container.setRadius(RADIUS, RADIUS, RADIUS, RADIUS);
   container.setFixedHeight(HEIGHT);
-  container.setMaximumWidth(86);
+  container.setFixedWidth(WIDTH);
   container.setLayout(row);
 
   return {

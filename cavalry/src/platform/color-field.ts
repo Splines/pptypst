@@ -7,9 +7,12 @@
 /** Pill background and grey caption ink, matching `size-field.ts`. */
 const FIELD_BG = "#2d2d2d";
 const CAPTION_INK = "#8a8a8a";
-/** Corner rounding and row height, in pixels, to match the Size field. */
+/** Corner rounding and pill size, in pixels, to match the Size field. */
 const RADIUS = 3;
 const HEIGHT = 22;
+const WIDTH = 94;
+/** Caption column width; the swatch sits to its right at a fixed gap. */
+const CAPTION_WIDTH = 42;
 /** Swatch size, in pixels; sits inside the pill with a little breathing room. */
 const CHIP_WIDTH = 26;
 const CHIP_HEIGHT = 14;
@@ -43,23 +46,19 @@ export function createColorField(options: ColorFieldOptions): ColorField {
 
   const caption = new ui.Label(options.label);
   caption.setTextColor(CAPTION_INK);
-  // Just wide enough for the word: without a cap the label expands and shoves
-  // the swatch to the far edge, leaving a wide gap after "Color".
-  caption.setMaximumWidth(42);
+  caption.setFixedWidth(CAPTION_WIDTH);
 
   const row = new ui.HLayout();
   row.setMargins(7, 0, 6, 0);
   row.setSpaceBetween(6);
   row.add(caption, chip);
-  // Any slack in the pill collects to the right of the swatch, not between it
-  // and the caption.
   row.addStretch();
 
   const container = new ui.Container();
   container.setBackgroundColor(FIELD_BG);
   container.setRadius(RADIUS, RADIUS, RADIUS, RADIUS);
   container.setFixedHeight(HEIGHT);
-  container.setMaximumWidth(92);
+  container.setFixedWidth(WIDTH);
   container.setLayout(row);
   container.setToolTip("Fill colour for the formula — double-click the swatch for the Color Editor");
 
