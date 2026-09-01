@@ -1,13 +1,13 @@
 /**
- * Bundles the Vite build and the vendored assets into one archive the user
- * unpacks straight into their Cavalry Scripts folder:
+ * Bundles the Vite build and the vendored assets into one zip the user unpacks
+ * straight into their Cavalry Scripts folder:
  *
  *   dist/PPTypst/                 (staging dir, also left on disk to browse)
  *     PPTypst.js                  (dist/pptypst-cavalry.js, from `npm run build`)
  *     pptypst_assets/vendor/      (assets/vendor/, from `npm run assets`)
- *   dist/PPTypst.tar.gz           (the two entries above, at the archive root)
+ *   dist/PPTypst.zip              (the two entries above, at the archive root)
  *
- * Install: unpack `dist/PPTypst.tar.gz` into the Cavalry Scripts folder
+ * Install: unpack `dist/PPTypst.zip` into the Cavalry Scripts folder
  *   macOS    ~/Library/Application Support/Cavalry/Scripts
  *   Windows  %APPDATA%/Cavalry/Scripts
  * so it holds `PPTypst.js` next to `pptypst_assets/`, then open it from
@@ -15,7 +15,8 @@
  * `ui.scriptLocation` (the Scripts folder); the `_assets` suffix keeps
  * `pptypst_assets` out of the Scripts menu.
  *
- * Run with: npm run pack   (or `npm run setup` for assets + build + pack)
+ * Needs the `zip` command on PATH. Run with: npm run pack
+ * (or `npm run setup` for assets + build + pack).
  */
 
 import { cp, mkdir, readdir, rm, stat } from "node:fs/promises";
@@ -26,7 +27,7 @@ import { fileURLToPath } from "node:url";
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const dist = join(root, "dist");
 const out = join(dist, "PPTypst");
-const archive = join(dist, "PPTypst.tar.gz");
+const archive = join(dist, "PPTypst.zip");
 
 async function exists(path) {
   try {
@@ -71,20 +72,20 @@ for (const f of vendorFiles) {
 }
 console.log(`  pptypst_assets   ${vendorFiles.length} files, ${human(vendorBytes)}`);
 
-// `-C out` + explicit members => the archive has PPTypst.js and pptypst_assets/
-// at its root, no wrapping folder.
-const tar = spawnSync(
-  "tar",
-  ["-czf", archive, "-C", out, "PPTypst.js", "pptypst_assets"],
-  { stdio: "inherit" },
+// Run from the staging dir with explicit members, so the archive has
+// PPTypst.js and pptypst_assets/ at its root, no wrapping folder.
+const zip = spawnSync(
+  "zip",
+  ["-r", "-q", "-X", archive, "PPTypst.js", "pptypst_assets"],
+  { cwd: out, stdio: "inherit" },
 );
-if (tar.error) {
-  throw new Error(`Could not run \`tar\`: ${tar.error.message}`);
+if (zip.error) {
+  throw new Error(`Could not run \`zip\`: ${zip.error.message}`);
 }
-if (tar.status !== 0) {
-  throw new Error(`\`tar\` exited with status ${String(tar.status)}`);
+if (zip.status !== 0) {
+  throw new Error(`\`zip\` exited with status ${String(zip.status)}`);
 }
 
 console.log(`\nstaged folder   ${out}`);
-console.log(`archive         ${archive}   (${human(await sizeOf(archive))})`);
+console.log(`zip             ${archive}   (${human(await sizeOf(archive))})`);
 console.log("Unpack it into your Cavalry Scripts folder.");

@@ -25,13 +25,13 @@ npm run setup       # assets + build + pack, in one go
 | ---------------- | ---------------------------------------------------------------- |
 | `npm run assets` | `assets/vendor/` — the two wasm modules + 12 fonts (~35 MB)      |
 | `npm run build`  | `dist/pptypst-cavalry.js` — the window script (Vite, minified IIFE) |
-| `npm run pack`   | `dist/PPTypst.tar.gz` — that script + the assets, ready to install |
+| `npm run pack`   | `dist/PPTypst.zip` — that script + the assets, ready to install  |
 
 ## Install
 
 The wasm modules and fonts are far too large to embed in the script, so it reads
-them from a `pptypst_assets/` folder sitting next to it. `dist/PPTypst.tar.gz`
-holds both, at the archive root:
+them from a `pptypst_assets/` folder sitting next to it. `dist/PPTypst.zip` holds
+both, at the archive root:
 
 ```
 PPTypst.js
@@ -41,13 +41,12 @@ pptypst_assets/vendor/   (wasm + fonts)
 1. In Cavalry: **Scripts ▸ Show Scripts Folder** (or go there directly):
    - macOS — `~/Library/Application Support/Cavalry/Scripts`
    - Windows — `%APPDATA%/Cavalry/Scripts`
-2. Unpack `dist/PPTypst.tar.gz` into that folder, so it now holds `PPTypst.js`
-   next to `pptypst_assets/`. (`tar -xzf PPTypst.tar.gz -C "<Scripts folder>"`,
-   or extract with any archive tool.)
+2. Extract `dist/PPTypst.zip` into that folder, so it now holds `PPTypst.js`
+   next to `pptypst_assets/`.
 3. Open **Window ▸ Scripts ▸ PPTypst**, type some Typst, and click **Insert**.
 
 The `pptypst_assets` folder is hidden from the Scripts menu by its `_assets`
-suffix. To update, unpack a fresh archive over the old files.
+suffix. To update, extract a fresh zip over the old files.
 
 ### JavaScript-Editor dev loop
 
