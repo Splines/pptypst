@@ -1,0 +1,13 @@
+{
+    // Build tooling runs on Node (invoked as `node scripts/*.ts`, via native
+    // type stripping), so it needs Node's types instead of the Cavalry ones.
+    "extends": "./tsconfig.json",
+    "compilerOptions": {
+        "types": [
+            "node"
+        ]
+    },
+    "include": [
+        "scripts/**/*.ts"
+    ]
+}

@@ -34,7 +34,7 @@ const TEXT_FONTS = [
 ];
 const TEXT_FONT_BASE = "https://cdn.jsdelivr.net/gh/typst/typst-assets@v0.13.1/files/fonts/";
 
-async function exists(path) {
+async function exists(path: string): Promise<boolean> {
   try {
     await access(path);
     return true;
@@ -44,7 +44,7 @@ async function exists(path) {
 }
 
 /** Resolves a file inside an installed package, trying the package root then the repo root. */
-function resolvePackageFile(relPath) {
+function resolvePackageFile(relPath: string): string {
   try {
     return require.resolve(relPath);
   } catch {
@@ -53,13 +53,13 @@ function resolvePackageFile(relPath) {
   }
 }
 
-async function copyInto(srcPath, name) {
+async function copyInto(srcPath: string, name: string): Promise<void> {
   const dest = join(vendorDir, name);
   await copyFile(srcPath, dest);
   console.log(`  copied  ${name}`);
 }
 
-async function main() {
+async function main(): Promise<void> {
   await mkdir(vendorDir, { recursive: true });
 
   await copyInto(
@@ -87,13 +87,13 @@ async function main() {
     try {
       const res = await fetch(TEXT_FONT_BASE + font);
       if (!res.ok) {
-        console.warn(`  WARN   ${font}: HTTP ${res.status}`);
+        console.warn(`  WARN   ${font}: HTTP ${String(res.status)}`);
         continue;
       }
       await writeFile(dest, Buffer.from(await res.arrayBuffer()));
       console.log(`  fetched ${font}`);
     } catch (err) {
-      console.warn(`  WARN   ${font}: ${err.message}`);
+      console.warn(`  WARN   ${font}: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 
@@ -102,7 +102,7 @@ async function main() {
   console.log("For JS-Editor testing: `PPTYPST_ASSET_DIR=\"<abs path above>\" npm run build`.");
 }
 
-main().catch((err) => {
+main().catch((err: unknown) => {
   console.error(err);
   process.exit(1);
 });

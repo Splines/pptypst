@@ -29,7 +29,7 @@ const dist = join(root, "dist");
 const out = join(dist, "PPTypst");
 const archive = join(dist, "PPTypst.zip");
 
-async function exists(path) {
+async function exists(path: string): Promise<boolean> {
   try {
     await stat(path);
     return true;
@@ -38,11 +38,11 @@ async function exists(path) {
   }
 }
 
-async function sizeOf(path) {
+async function sizeOf(path: string): Promise<number> {
   return (await stat(path)).size;
 }
 
-function human(bytes) {
+function human(bytes: number): string {
   return bytes < 1024 * 1024
     ? `${(bytes / 1024).toFixed(1)} KiB`
     : `${(bytes / 1024 / 1024).toFixed(1)} MiB`;
@@ -70,7 +70,7 @@ let vendorBytes = 0;
 for (const f of vendorFiles) {
   vendorBytes += await sizeOf(join(out, "pptypst_assets", "vendor", f));
 }
-console.log(`  pptypst_assets   ${vendorFiles.length} files, ${human(vendorBytes)}`);
+console.log(`  pptypst_assets   ${String(vendorFiles.length)} files, ${human(vendorBytes)}`);
 
 // Run from the staging dir with explicit members, so the archive has
 // PPTypst.js and pptypst_assets/ at its root, no wrapping folder.

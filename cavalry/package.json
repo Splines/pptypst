@@ -5,11 +5,11 @@
   "type": "module",
   "description": "PPTypst integration for the Cavalry animation software.",
   "scripts": {
-    "assets": "node scripts/fetch-assets.mjs",
+    "assets": "node scripts/fetch-assets.ts",
     "build": "vite build",
-    "pack": "node scripts/pack.mjs",
+    "pack": "node scripts/pack.ts",
     "test": "node --test",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json && tsc --noEmit -p tsconfig.scripts.json",
     "lint": "eslint --config .config/eslint.mjs src test scripts vite.config.ts",
     "check": "npm run typecheck && npm run lint && npm test",
     "setup": "npm run assets && npm run build && npm run pack"

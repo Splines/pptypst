@@ -88,13 +88,20 @@ export default defineConfig([
     },
   },
   {
-    // Build tooling: plain Node ESM, no type-checked linting.
-    files: ["scripts/**/*.mjs"],
-    extends: [tseslint.configs.disableTypeChecked],
+    // Build tooling: Node ESM in TypeScript, run directly via `node`'s native
+    // type stripping. Outside the Cavalry-only build, so its own tsconfig.
+    files: ["scripts/**/*.ts"],
+    plugins: { "@stylistic": stylistic },
+    extends: typeChecked,
+    rules: style,
     languageOptions: {
       ecmaVersion: 2022,
       sourceType: "module",
       globals: { ...globals.node },
+      parserOptions: {
+        project: "./tsconfig.scripts.json",
+        tsconfigRootDir: import.meta.dirname + "/..",
+      },
     },
   },
 ]);
