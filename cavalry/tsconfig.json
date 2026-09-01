@@ -1,0 +1,28 @@
+{
+    "compilerOptions": {
+        "target": "es2021",
+        "module": "esnext",
+        "lib": [
+            "ES2021"
+        ],
+        "types": [
+            "@scenery/cavalry-types"
+        ],
+        "moduleResolution": "bundler",
+        "isolatedModules": true,
+        "useDefineForClassFields": true,
+        "strict": true,
+        "strictNullChecks": true,
+        "sourceMap": false,
+        "resolveJsonModule": true,
+        "noEmit": true,
+        "noUnusedLocals": true,
+        "noUnusedParameters": true,
+        "noImplicitReturns": true,
+        "skipLibCheck": true
+    },
+    "include": [
+        "src/**/*.ts",
+        "src/**/*.d.ts"
+    ]
+}
