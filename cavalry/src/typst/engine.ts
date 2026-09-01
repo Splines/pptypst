@@ -46,14 +46,10 @@ export interface TypstAssetFiles {
   textFonts: readonly string[];
 }
 
-/** Receives human-readable progress messages; init takes a few seconds. */
-export type ProgressListener = (message: string) => void;
-
 export interface TypstEngineOptions {
   assets: AssetReader;
   files: TypstAssetFiles;
   document: Omit<DocumentOptions, "fontSizePt">;
-  onProgress?: ProgressListener;
 }
 
 export interface TypstEngine {
@@ -75,34 +71,21 @@ function formatDiagnostics(diagnostics: readonly unknown[]): string {
 
 export function createTypstEngine(options: TypstEngineOptions): TypstEngine {
   const { assets, files, document } = options;
-  const report: ProgressListener = (message) => {
-    console.log(`[pptypst] ${message}`);
-    options.onProgress?.(message);
-  };
 
   let compiler: any = null;
   let renderer: any = null;
   let ready: Promise<void> | null = null;
 
-  function readAsset(fileName: string): Uint8Array {
-    report(`reading ${fileName} ...`);
-    const bytes = assets.read(fileName);
-    report(`read ${fileName} (${String(Math.round(bytes.length / 1024))} KiB)`);
-    return bytes;
-  }
-
   /** See the file header: synchronous instantiation is required in Cavalry. */
-  function instantiateWasm(wrapper: any, bytes: Uint8Array, label: string): void {
-    report(`compiling ${label} wasm (synchronous) ...`);
+  function instantiateWasm(wrapper: any, bytes: Uint8Array): void {
     wrapper.initSync({ module: bytes });
-    report(`${label} wasm instantiated`);
   }
 
   function loadFontBytes(): Uint8Array[] {
-    const fonts = [readAsset(files.mathFont)];
+    const fonts = [assets.read(files.mathFont)];
     for (const name of files.textFonts) {
       try {
-        fonts.push(readAsset(name));
+        fonts.push(assets.read(name));
       } catch {
         console.warn(`[pptypst] optional font missing, skipping: ${name}`);
       }
@@ -112,15 +95,14 @@ export function createTypstEngine(options: TypstEngineOptions): TypstEngine {
 
   function initOnce(): Promise<void> {
     ready ??= (async () => {
-      const compilerWasm = readAsset(files.compilerWasm);
-      const rendererWasm = readAsset(files.rendererWasm);
+      const compilerWasm = assets.read(files.compilerWasm);
+      const rendererWasm = assets.read(files.rendererWasm);
       const fonts = loadFontBytes();
 
-      instantiateWasm(compilerWrapper, compilerWasm, "compiler");
-      instantiateWasm(rendererWrapper, rendererWasm, "renderer");
+      instantiateWasm(compilerWrapper, compilerWasm);
+      instantiateWasm(rendererWrapper, rendererWasm);
 
       compiler = createTypstCompiler();
-      report(`loading compiler + ${String(fonts.length)} fonts ...`);
       await compiler.init({
         getWrapper: () => Promise.resolve(compilerWrapper),
         getModule: () => compilerWasm,
@@ -132,15 +114,12 @@ export function createTypstEngine(options: TypstEngineOptions): TypstEngine {
           withAccessModel(new MemoryAccessModel()),
         ],
       });
-      report("compiler + fonts ready");
 
       renderer = createTypstRenderer();
-      report("loading renderer ...");
       await renderer.init({
         getWrapper: () => Promise.resolve(rendererWrapper),
         getModule: () => rendererWasm,
       });
-      report("typst.ts WASM initialised");
     })();
     return ready;
   }

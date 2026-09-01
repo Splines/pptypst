@@ -45,7 +45,6 @@ const engine = createTypstEngine({
   assets: createAssetReader(),
   files: ASSET_FILES,
   document: DOCUMENT,
-  onProgress: panel.setStatus,
 });
 
 /** The formula currently loaded for editing, if it is still in the scene. */
@@ -105,7 +104,6 @@ function syncToSelection(): void {
     if (editingLayerId !== null) {
       editingLayerId = null;
       panel.setEditing(false);
-      panel.setStatus("No formula selected — Insert creates a new one.");
     }
     return;
   }
@@ -124,7 +122,6 @@ function syncToSelection(): void {
   panel.setFontSizePt(fontSizePt);
   panel.setSource(found.formula.source); // fires onSourceChanged -> schedulePreview
   panel.setEditing(true);
-  panel.setStatus("Loaded formula from selection — Insert now updates it.");
 }
 
 /* -------------------------------------------------------------------------- */
