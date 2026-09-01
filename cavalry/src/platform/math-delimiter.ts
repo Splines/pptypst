@@ -17,6 +17,8 @@ const RADIUS = 3;
 const HEIGHT = 20;
 /** "$" size, in pixels; large enough to read as a delimiter, not a caption. */
 const SIGN_FONT_PX = 15;
+/** Left indent of the "$", roughly matching the editor's own text padding. */
+const SIGN_INSET = 8;
 
 export interface MathDelimiters {
   /** Place directly above the editor. */
@@ -27,16 +29,15 @@ export interface MathDelimiters {
   setActive: (active: boolean) => void;
 }
 
-/** Builds one centred "$" plate; `corners` rounds only the edge away from the editor. */
+/** Builds one left-aligned "$" plate; `corners` rounds only the edge away from the editor. */
 function createPlate(corners: readonly [number, number, number, number]): ui.Container {
   const sign = new ui.Label("$");
   sign.setTextColor(SIGN_INK);
   sign.setFontSize(SIGN_FONT_PX);
-  sign.setAlignment(1); // centre
+  sign.setAlignment(0); // left
 
   const row = new ui.HLayout();
-  row.setMargins(0, 0, 0, 0);
-  row.addStretch();
+  row.setMargins(SIGN_INSET, 0, 0, 0);
   row.add(sign);
   row.addStretch();
 

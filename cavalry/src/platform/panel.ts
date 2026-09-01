@@ -66,9 +66,9 @@ const MIN_FONT_SIZE_PT = 1;
 const MAX_FONT_SIZE_PT = 1000;
 
 /** The editor's height before the user drags the grip, in pixels. */
-const EDITOR_DEFAULT_HEIGHT = 120;
+const EDITOR_DEFAULT_HEIGHT = 80;
 /** How far the grip may shrink / grow the editor, in pixels. */
-const EDITOR_MIN_HEIGHT = 72;
+const EDITOR_MIN_HEIGHT = 50;
 const EDITOR_MAX_HEIGHT = 600;
 
 export function createPanel(handlers: PanelHandlers): Panel {
@@ -132,11 +132,27 @@ export function createPanel(handlers: PanelHandlers): Panel {
   // "Only Math" -- ticking it wraps the source in `$ ... $` before compiling,
   // so the user writes plain maths. Mirrors the PowerPoint add-in's checkbox.
   const mathModeCheckbox = new ui.Checkbox(false);
-  const mathModeLabel = new ui.Label("Only Math");
-  mathModeLabel.setToolTip("Wrap the source in display-math delimiters ($) before compiling");
-  mathModeCheckbox.onValueChanged = () => {
+  const MATH_MODE_TOOLTIP = "Wrap the source in display-math delimiters ($) before compiling";
+  const onMathModeToggled = (): void => {
     applyMathModeCues(mathModeCheckbox.getValue());
     handlers.onMathModeChanged();
+  };
+  mathModeCheckbox.onValueChanged = onMathModeToggled;
+
+  // Cavalry's Checkbox carries no label and Label has no click event, so the
+  // caption is a Label in a Container whose press toggles the box -- the usual
+  // "click the words, not just the tick" accessibility affordance.
+  const mathModeLabel = new ui.Label("Only Math");
+  const mathModeLabelRow = new ui.HLayout();
+  mathModeLabelRow.setMargins(2, 0, 2, 0);
+  mathModeLabelRow.add(mathModeLabel);
+  const mathModeLabelBox = new ui.Container();
+  mathModeLabelBox.setLayout(mathModeLabelRow);
+  mathModeLabelBox.setToolTip(MATH_MODE_TOOLTIP);
+  mathModeCheckbox.setToolTip(MATH_MODE_TOOLTIP);
+  mathModeLabelBox.onMousePress = () => {
+    mathModeCheckbox.setValue(!mathModeCheckbox.getValue());
+    onMathModeToggled();
   };
 
   const insertButton = new ui.Button("Insert");
@@ -164,7 +180,7 @@ export function createPanel(handlers: PanelHandlers): Panel {
   const fontSizeRow = new ui.HLayout();
   fontSizeRow.add(fontSizeField.widget);
   fontSizeRow.addSpacing(10);
-  fontSizeRow.add(mathModeCheckbox, mathModeLabel);
+  fontSizeRow.add(mathModeCheckbox, mathModeLabelBox);
   fontSizeRow.addStretch();
 
   ui.add(fontSizeRow);

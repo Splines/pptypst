@@ -11,8 +11,12 @@
 /** `api.setPreferenceObject` key; namespaced so it can't collide with Cavalry's. */
 const ONLY_MATH_KEY = "pptypst.onlyMath";
 
-/** What a fresh formula starts with when nothing has been saved yet. */
-export const DEFAULT_ONLY_MATH = false;
+/**
+ * What "Only Math" starts as before the user has ever touched it. On, to match
+ * the PowerPoint add-in (whose checkbox ships `checked`): most insertions are a
+ * single expression, and typing the `$ ... $` by hand every time is friction.
+ */
+export const DEFAULT_ONLY_MATH = true;
 
 /** The remembered "Only Math" choice, or {@link DEFAULT_ONLY_MATH} if unset. */
 export function loadOnlyMathPreference(): boolean {
