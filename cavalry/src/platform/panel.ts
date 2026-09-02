@@ -142,6 +142,20 @@ const EDITOR_MAX_HEIGHT = 280;
  * shorter (and a little taller, up to this, for the editor grip's range).
  */
 const MAX_WINDOW_HEIGHT = 680;
+
+/**
+ * Right-hand inset, on top of the 3px default margin, kept clear for the
+ * window's own vertical scrollbar. Cavalry draws that scrollbar as an overlay
+ * on the very edge; the gutter stops it landing on top of the source / preamble
+ * editors' own inner scrollbars, which would otherwise be impossible to grab.
+ * Applied only while the content actually overflows the window (see
+ * `syncScrollbarGutter`) -- a permanent empty strip looks worse than it helps.
+ *
+ * Tuned to about the scrollbar's own width, so the leftover space between the
+ * content and the scrollbar roughly matches the panel's 3px left margin.
+ */
+const WINDOW_SCROLLBAR_GUTTER = 12;
+
 /** Editor text size, in pixels; the toolkit default is too small to read comfortably. */
 const EDITOR_FONT_SIZE_PX = 18;
 
@@ -151,6 +165,11 @@ const STATUS_ERROR_INK = "#ff5c5c";
 
 export function createPanel(handlers: PanelHandlers): Panel {
   ui.setTitle("PPTypst");
+
+  // Whether the right-hand scrollbar gutter is currently applied. Toggled by
+  // `syncScrollbarGutter` (defined below) whenever the content might have grown
+  // or shrunk past the window height.
+  let gutterOn = false;
 
   const editor = new ui.MultiLineEdit();
   editor.setFontSize(EDITOR_FONT_SIZE_PX);
@@ -171,11 +190,15 @@ export function createPanel(handlers: PanelHandlers): Panel {
   };
 
   // A grab bar under the editor: drags resize it, and pinning it to a fixed
-  // height keeps it from stretching as the window grows taller.
+  // height keeps it from stretching as the window grows taller. Each drag may
+  // push the content past the window height, so re-check the scrollbar gutter.
   const editorGrip = createResizeGrip(editor, {
     defaultHeight: EDITOR_DEFAULT_HEIGHT,
     minHeight: EDITOR_MIN_HEIGHT,
     maxHeight: EDITOR_MAX_HEIGHT,
+    onResize: () => {
+      syncScrollbarGutter();
+    },
   });
 
   const preview = createPreview();
@@ -199,6 +222,9 @@ export function createPanel(handlers: PanelHandlers): Panel {
     defaultHeight: PREAMBLE_EDITOR_DEFAULT_HEIGHT,
     minHeight: EDITOR_MIN_HEIGHT,
     maxHeight: EDITOR_MAX_HEIGHT,
+    onResize: () => {
+      syncScrollbarGutter();
+    },
   });
   preambleEditor.setHidden(true);
   preambleGrip.widget.setHidden(true);
@@ -228,6 +254,7 @@ export function createPanel(handlers: PanelHandlers): Panel {
     preambleEditor.setHidden(!open);
     preambleGrip.widget.setHidden(!open);
     refreshPreambleSummary();
+    syncScrollbarGutter(); // expanding the section can push content past the window
   };
 
   const applyPreambleScope = (shapeScope: boolean): void => {
@@ -371,22 +398,67 @@ export function createPanel(handlers: PanelHandlers): Panel {
   ui.setMinimumWidth(360);
   ui.setMaximumHeight(MAX_WINDOW_HEIGHT);
 
-  // Keep the preview strip spanning the panel as it is resized. The default
-  // layout margin is 3px a side, so the usable content width is 6px short.
-  // `ui.size()` is typed `unknown` by the Cavalry types.
-  const panelWidth = (): number => (ui.size() as { width: number }).width - 6;
-  ui.onResize = () => {
+  // Keep the preview strip spanning the panel as it is resized. Usable content
+  // width is the window width less the left margin (3px) and the right margin --
+  // 3px, plus the scrollbar gutter while it is applied. `ui.size()` is typed
+  // `unknown` by the Cavalry types.
+  const panelWidth = (): number =>
+    (ui.size() as { width: number }).width - 6 - (gutterOn ? WINDOW_SCROLLBAR_GUTTER : 0);
+
+  function applyContentWidths(): void {
     const width = panelWidth();
     preview.setWidth(width);
     editorGrip.setWidth(width);
     preambleGrip.setWidth(width);
+  }
+
+  /**
+   * The window's overflow scrollbar is an overlay on the right edge -- with no
+   * gutter it covers the source / preamble editors' own scrollbars. So reserve
+   * the gutter only while the content is actually taller than the window: an
+   * empty 16px strip the rest of the time looks worse than it helps.
+   *
+   * `span` is the rendered distance from the top of the first widget to the
+   * bottom of the last, plus the 3px top and bottom margins; it is unaffected
+   * by scroll position (both ends move together). Toggling only reflows the
+   * layout narrower/wider, which cannot flip the result back (a narrower status
+   * line only grows taller), so this settles in one pass.
+   */
+  function syncScrollbarGutter(): void {
+    const size = ui.size() as { width: number; height: number };
+    const span
+      = statusBox.geometry().bottom - fontSizeField.widget.geometry().top + 6;
+    if (span <= 6) {
+      return; // geometry not laid out yet
+    }
+    const want = span > size.height + 2;
+    if (want === gutterOn) {
+      return;
+    }
+    gutterOn = want;
+    ui.setMargins(3, 3, gutterOn ? 3 + WINDOW_SCROLLBAR_GUTTER : 3, 3);
+    applyContentWidths();
+  }
+
+  ui.onResize = () => {
+    applyContentWidths();
+    syncScrollbarGutter();
   };
 
   ui.show();
-  preview.setWidth(panelWidth());
-  editorGrip.setWidth(panelWidth());
-  preambleGrip.setWidth(panelWidth());
+  applyContentWidths();
   applyMathModeCues(mathModeCheckbox.getValue());
+
+  // Geometry is not settled synchronously after `show`; check the gutter on the
+  // next tick, and again on every resize / grip drag / preamble toggle.
+  const gutterTimer = new api.Timer({
+    onTimeout: () => {
+      syncScrollbarGutter();
+    },
+  });
+  gutterTimer.setRepeating(false);
+  gutterTimer.setInterval(0);
+  gutterTimer.start();
 
   return {
     getSource: () => editor.getText().trim(),
@@ -418,11 +490,13 @@ export function createPanel(handlers: PanelHandlers): Panel {
       statusMessage = message;
       status.setText(message);
       status.setTextColor(STATUS_INK);
+      syncScrollbarGutter(); // a longer message can wrap to another line
     },
     showError: (message: string) => {
       statusMessage = message;
       status.setText(message);
       status.setTextColor(STATUS_ERROR_INK);
+      syncScrollbarGutter();
     },
     setBusy: (busy: boolean) => {
       insertButton.setEnabled(!busy);
