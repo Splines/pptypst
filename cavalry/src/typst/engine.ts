@@ -77,8 +77,17 @@ export function createTypstEngine(options: TypstEngineOptions): TypstEngine {
   let renderer: any = null;
   let ready: Promise<void> | null = null;
 
+  /** First four bytes of every WebAssembly module: "\0asm". */
+  const WASM_MAGIC = [0x00, 0x61, 0x73, 0x6d];
+
   /** See the file header: synchronous instantiation is required in Cavalry. */
-  function instantiateWasm(wrapper: any, bytes: Uint8Array): void {
+  function instantiateWasm(wrapper: any, bytes: Uint8Array, fileName: string): void {
+    if (bytes.length < 4 || WASM_MAGIC.some((byte, i) => bytes[i] !== byte)) {
+      throw new Error(
+        `"${fileName}" is not a valid WebAssembly module -- the PPTypst assets `
+        + `are missing or corrupt. Re-copy the "pptypst_assets" folder.`,
+      );
+    }
     wrapper.initSync({ module: bytes });
   }
 
@@ -100,8 +109,8 @@ export function createTypstEngine(options: TypstEngineOptions): TypstEngine {
       const rendererWasm = assets.read(files.rendererWasm);
       const fonts = loadFontBytes();
 
-      instantiateWasm(compilerWrapper, compilerWasm);
-      instantiateWasm(rendererWrapper, rendererWasm);
+      instantiateWasm(compilerWrapper, compilerWasm, files.compilerWasm);
+      instantiateWasm(rendererWrapper, rendererWasm, files.rendererWasm);
 
       compiler = createTypstCompiler();
       await compiler.init({
@@ -121,7 +130,12 @@ export function createTypstEngine(options: TypstEngineOptions): TypstEngine {
         getWrapper: () => Promise.resolve(rendererWrapper),
         getModule: () => rendererWasm,
       });
-    })();
+    })().catch((error: unknown) => {
+      // Drop the cached promise so a later render retries -- e.g. once the user
+      // has copied in the missing `pptypst_assets` folder, without reloading.
+      ready = null;
+      throw error;
+    });
     return ready;
   }
 

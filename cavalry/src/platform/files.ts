@@ -36,9 +36,21 @@ export function createAssetReader(assetDir = resolveAssetDir()): AssetReader {
   return {
     read(fileName: string): Uint8Array {
       const path = `${assetDir}/${fileName}`;
+      if (!api.isFile(path)) {
+        // The vendored assets are not bundled with the script -- the user copies
+        // the `pptypst_assets` folder in by hand (see README). A missing folder
+        // is the common cause; call it out so the error isn't a cryptic wasm
+        // "expected magic word" further down the line.
+        throw new Error(
+          api.isDirectory(assetDir)
+            ? `PPTypst asset file is missing: ${path}`
+            : `PPTypst assets folder not found at "${assetDir}". Copy the `
+              + `"pptypst_assets" folder next to the installed script (see README).`,
+        );
+      }
       const base64 = api.encodeBinary(path);
       if (!base64) {
-        throw new Error(`Asset not found or empty: ${path}`);
+        throw new Error(`PPTypst asset could not be read (empty): ${path}`);
       }
       return base64ToBytes(base64);
     },
