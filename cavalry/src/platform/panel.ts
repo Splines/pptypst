@@ -13,7 +13,7 @@ import { createPreview } from "./preview.ts";
 import { createResizeGrip } from "./resize-grip.ts";
 import { createSizeField } from "./size-field.ts";
 
-/** Seeded into the editor and shown as the placeholder while "Only Math" is off. */
+/** Shown as the editor placeholder while "Only Math" is off. */
 const EXAMPLE_SOURCE = "$ integral_0^1 x^2 dif x = 1/3 $";
 /** Placeholder while "Only Math" is on: the `$ ... $` is added for the user. */
 const EXAMPLE_SOURCE_MATH = "integral_0^1 x^2 dif x = 1/3";
@@ -107,23 +107,10 @@ export function createPanel(handlers: PanelHandlers): Panel {
 
   const mathDelimiters = createMathDelimiters();
 
-  // The seeded example is only valid for one "Only Math" state (with the `$`
-  // for off, without for on). While the user hasn't touched it, swapping the
-  // toggle swaps the example too; once they type, we leave their text alone.
-  let editorHoldsExample = true;
-  // Set while `seedExample` calls `setText`, so the resulting `onValueChanged`
-  // is ignored: it isn't a user edit, and firing `onSourceChanged` from here
-  // can re-enter the app before its module finishes initialising.
-  let seedingExample = false;
-  const seedExample = (mathMode: boolean): void => {
-    seedingExample = true;
-    editor.setText(mathMode ? EXAMPLE_SOURCE_MATH : EXAMPLE_SOURCE);
-    seedingExample = false;
-  };
-
-  // Reflects "Only Math" into the editor: the bracketing "$" plates appear,
-  // and the placeholder switches to an example without the delimiters (the
-  // user types the maths, PPTypst adds the `$ ... $`).
+  // Reflects "Only Math" into the editor: the bracketing "$" plates appear and
+  // the placeholder switches to an example without the delimiters (the user
+  // types the maths, PPTypst adds the `$ ... $`). The editor starts empty -- no
+  // seeded example -- so a fresh window shows only the placeholder.
   const applyMathModeCues = (mathMode: boolean): void => {
     mathDelimiters.setActive(mathMode);
     editor.setPlaceholder(
@@ -131,12 +118,7 @@ export function createPanel(handlers: PanelHandlers): Panel {
         ? `Typst math, e.g.  ${EXAMPLE_SOURCE_MATH}`
         : `Typst source, e.g.  ${EXAMPLE_SOURCE}`,
     );
-    if (editorHoldsExample) {
-      seedExample(mathMode);
-    }
   };
-
-  seedExample(false);
 
   // A grab bar under the editor: drags resize it, and pinning it to a fixed
   // height keeps it from stretching as the window grows taller.
@@ -216,10 +198,6 @@ export function createPanel(handlers: PanelHandlers): Panel {
     handlers.onInsert();
   };
   editor.onValueChanged = () => {
-    if (seedingExample) {
-      return; // programmatic example swap, not a user edit
-    }
-    editorHoldsExample = false;
     handlers.onSourceChanged();
   };
 

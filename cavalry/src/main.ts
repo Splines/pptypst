@@ -19,8 +19,10 @@ import { createPanel } from "./platform/panel.ts";
 import {
   DEFAULT_ONLY_MATH,
   loadFillColorPreference,
+  loadFontSizePreference,
   loadOnlyMathPreference,
   saveFillColorPreference,
+  saveFontSizePreference,
   saveOnlyMathPreference,
 } from "./platform/preferences.ts";
 import {
@@ -59,39 +61,37 @@ const panel = createPanel({
     schedulePreview();
   },
   onFontSizeChanged: () => {
+    rememberSettings();
     schedulePreview();
   },
   onMathModeChanged: () => {
-    // Only a fresh insert seeds the default; while editing a formula the tick
-    // belongs to that formula, not the global preference (mirrors PowerPoint).
-    if (editingLayerId === null) {
-      saveOnlyMathPreference(panel.getMathMode());
-    }
+    rememberSettings();
     schedulePreview();
   },
   onFillColorChanged: () => {
-    // Same rule as "Only Math": a fresh insert updates the remembered default,
-    // editing an existing formula does not.
-    if (editingLayerId === null) {
-      saveFillColorPreference(panel.getFillColor());
-    }
+    rememberSettings();
     schedulePreview();
   },
   onReset: () => {
-    const color = derivedFillColor();
     panel.setFontSizePt(derivedFontSizePt());
     panel.setMathMode(DEFAULT_ONLY_MATH);
-    panel.setFillColor(color);
-    // Same rule as the Color and "Only Math" handlers: a fresh insert also
-    // forgets the remembered choices, while editing a formula leaves the
-    // global defaults alone (the reset only re-populates its fields).
-    if (editingLayerId === null) {
-      saveOnlyMathPreference(DEFAULT_ONLY_MATH);
-      saveFillColorPreference(color);
-    }
+    panel.setFillColor(derivedFillColor());
+    rememberSettings();
     schedulePreview();
   },
 });
+
+/**
+ * Persists the panel's current Size, Color and "Only Math" so the next launch
+ * opens with the last-used values -- whether the user set them by hand or by
+ * selecting a formula whose settings loaded into the panel. The Reset button is
+ * what returns these to composition-derived defaults.
+ */
+function rememberSettings(): void {
+  saveFontSizePreference(panel.getFontSizePt());
+  saveFillColorPreference(panel.getFillColor());
+  saveOnlyMathPreference(panel.getMathMode());
+}
 
 const engine = createTypstEngine({
   assets: createAssetReader(),
@@ -175,6 +175,9 @@ function syncToSelection(): void {
   panel.setMathMode(found.formula.mathMode);
   panel.setFillColor(found.formula.color);
   panel.setSource(found.formula.source); // fires onSourceChanged -> schedulePreview
+  // The panel setters above fire no handlers, so persist here: the last object
+  // the user touched becomes what the next launch opens with.
+  rememberSettings();
 
   // Only an intact group can be updated in place; a loose glyph loads read-only
   // and a button press inserts a fresh formula.
@@ -261,13 +264,13 @@ function setBusy(value: boolean): void {
   panel.setBusy(value);
 }
 
-// Seed the panel's defaults for a fresh insert (a resolution-scaled font size,
-// the remembered "Only Math" choice, and a fill colour -- the saved one, or
-// one that contrasts with the active composition's background), then let any
-// current selection override them, then preview the initial source. The
-// seeding waits until here so the callbacks it may trigger see a fully
-// initialised module.
-panel.setFontSizePt(derivedFontSizePt());
+// Open with the last-used Size, Color and "Only Math" (see `rememberSettings`);
+// until the user has set one, fall back to a value derived from the active
+// composition -- a resolution-scaled font size, and an ink that contrasts with
+// the background. Then let any current selection override them and preview the
+// initial (empty) source. The seeding waits until here so the callbacks it may
+// trigger see a fully initialised module.
+panel.setFontSizePt(loadFontSizePreference() ?? derivedFontSizePt());
 panel.setMathMode(loadOnlyMathPreference());
 panel.setFillColor(loadFillColorPreference() ?? derivedFillColor());
 syncToSelection();

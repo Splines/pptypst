@@ -2,15 +2,16 @@
  * The panel's cross-session user preferences, stored via Cavalry's own
  * `api.*PreferenceObject` bucket (the same place the app keeps its settings).
  *
- * The "Only Math" toggle and the fill colour live here. Both mirror the
- * PowerPoint add-in, which remembers them in `localStorage` and seeds a fresh
- * formula from them; a formula opened for editing carries its own saved values
- * (see `core/formula.ts`) and takes precedence.
+ * The "Only Math" toggle, the fill colour and the font size live here. They
+ * make the panel sticky across launches: whatever the user last had (set by
+ * hand, or loaded by selecting a formula) is what the next window opens with.
+ * The Reset button is what returns them to composition-derived defaults.
  */
 
 /** `api.setPreferenceObject` keys; namespaced so they can't collide with Cavalry's. */
 const ONLY_MATH_KEY = "pptypst.onlyMath";
 const FILL_COLOR_KEY = "pptypst.fillColor";
+const FONT_SIZE_KEY = "pptypst.fontSizePt";
 
 /**
  * What "Only Math" starts as before the user has ever touched it. On, to match
@@ -49,4 +50,22 @@ export function loadFillColorPreference(): string | null {
 /** Remembers `color` (a hex string) for future sessions. */
 export function saveFillColorPreference(color: string): void {
   api.setPreferenceObject(FILL_COLOR_KEY, color);
+}
+
+/**
+ * The remembered font size in points, or `null` when the user has never set
+ * one -- the caller then derives a default from the active composition's height
+ * (see `core/font-size.ts`).
+ */
+export function loadFontSizePreference(): number | null {
+  if (!api.hasPreferenceObject(FONT_SIZE_KEY)) {
+    return null;
+  }
+  const stored = api.getPreferenceObject(FONT_SIZE_KEY);
+  return typeof stored === "number" ? stored : null;
+}
+
+/** Remembers `fontSizePt` for future sessions. */
+export function saveFontSizePreference(fontSizePt: number): void {
+  api.setPreferenceObject(FONT_SIZE_KEY, fontSizePt);
 }
