@@ -414,7 +414,7 @@ type FlatPath = { d: string; style: Style };
 
 /** Distinguishes two resolved styles for merge purposes (see {@link mergeByStyle}). */
 function styleKey(s: Style): string {
-  return `${s.fill} ${s.stroke} ${s.strokeWidth} ${s.fillRule}`;
+  return `${s.fill} ${s.stroke} ${s.strokeWidth} ${s.fillRule}`;
 }
 
 /**
