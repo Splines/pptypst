@@ -60,7 +60,7 @@ export function createColorField(options: ColorFieldOptions): ColorField {
   container.setFixedHeight(HEIGHT);
   container.setFixedWidth(WIDTH);
   container.setLayout(row);
-  container.setToolTip("Fill colour for the formula — double-click the swatch for the Color Editor");
+  container.setToolTip("Fill colour for the formula");
 
   return {
     widget: container,
