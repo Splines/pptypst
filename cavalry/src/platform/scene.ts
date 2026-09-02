@@ -197,16 +197,14 @@ function importSvgAsGroup(svg: string, name: string): ImportedGroup {
     return !parent || !imported.has(parent);
   });
 
-  let groupId: string;
-  if (roots.length === 1) {
-    api.rename(roots[0], name);
-    groupId = roots[0];
-  } else {
-    groupId = api.create("group", name);
-    for (const id of roots) {
-      if (api.layerExists(id)) {
-        api.parent(id, groupId);
-      }
+  // Always create a group wrapper, even for a single shape. This ensures that
+  // the formula can be updated in the Script UI (the "grouped" flag requires
+  // the formula layer to have children). Single shapes get a proper folder so
+  // they can be re-edited instead of just re-inserted.
+  const groupId = api.create("group", name);
+  for (const id of roots) {
+    if (api.layerExists(id)) {
+      api.parent(id, groupId);
     }
   }
 
