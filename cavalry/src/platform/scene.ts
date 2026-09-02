@@ -47,23 +47,23 @@ export function getActiveCompHeightPx(): number {
 }
 
 /**
- * Attribute ids a composition might expose its background colour under, tried
+ * Attribute ids a composition might expose its background color under, tried
  * in order. Cavalry's Composition Settings labels it "Background"; the exact
  * scripting id has varied between builds, so a scan of every attribute (see
  * {@link looksLikeBackgroundColorAttr}) backs these up.
  */
 const COMP_BACKGROUND_ATTRS = ["backgroundColor", "background", "worldColor", "bgColor"];
-/** Matches the hex-string forms `api.get` returns a colour as. */
+/** Matches the hex-string forms `api.get` returns a color as. */
 const HEX_COLOR = /^#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
 
-/** Whether `attrId` plausibly names a composition's background-colour attribute. */
+/** Whether `attrId` plausibly names a composition's background-color attribute. */
 function looksLikeBackgroundColorAttr(attrId: string): boolean {
   const id = attrId.toLowerCase();
   if (id.includes("background")) {
     return true;
   }
-  const looksColour = id.includes("color") || id.includes("colour");
-  return looksColour && (id.includes("world") || id.includes("bg"));
+  const looksColor = id.includes("color");
+  return looksColor && (id.includes("world") || id.includes("bg"));
 }
 
 /** One 0..255 channel as a two-digit hex pair. */
@@ -82,8 +82,8 @@ function rgbToHex(r: number, g: number, b: number): string {
 }
 
 /**
- * `value` as a `#rrggbb` string, or `null` when it isn't a colour. `api.get`
- * returns a colour attribute in one of several shapes across Cavalry builds: a
+ * `value` as a `#rrggbb` string, or `null` when it isn't a color. `api.get`
+ * returns a color attribute in one of several shapes across Cavalry builds: a
  * hex string, an `rgb()/rgba()` string, an `[r, g, b, a]` array, or an
  * `{ r, g, b, a }` object -- the last two either 0..255 or normalised 0..1.
  */
@@ -109,7 +109,7 @@ function asHexColor(value: unknown): string | null {
 }
 
 /**
- * The active composition's background colour as a hex string, or `null` when
+ * The active composition's background color as a hex string, or `null` when
  * there is no active comp or the attribute can't be read. Used to seed a
  * default ink that contrasts with the scene (see `core/contrast.ts`).
  */
@@ -120,7 +120,7 @@ export function getActiveCompBackgroundHex(): string | null {
   }
 
   // Known ids first, then any other attribute whose id looks like a background
-  // colour -- the scripting path has changed between Cavalry builds.
+  // color -- the scripting path has changed between Cavalry builds.
   // `api.hasAttribute` keeps `api.get` from logging an error for a missing one.
   const candidates = [
     ...COMP_BACKGROUND_ATTRS,
@@ -220,7 +220,7 @@ function tidyShapeLayers(groupId: string): void {
  *
  * The per-shape copies are what let {@link findSelectedFormula} still recognise
  * a formula after the user ungroups it (a common move for finer animation
- * control): each loose "Typst Shape" then carries the source, colour and size
+ * control): each loose "Typst Shape" then carries the source, color and size
  * on its own.
  *
  * When `replaceLayerId` refers to a layer that still exists it is deleted, so

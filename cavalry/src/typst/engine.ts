@@ -49,7 +49,7 @@ export interface TypstAssetFiles {
 export interface TypstEngineOptions {
   assets: AssetReader;
   files: TypstAssetFiles;
-  /** Font size, math mode and colour are per-render (panel controls); see {@link TypstEngine.render}. */
+  /** Font size, math mode and color are per-render (panel controls); see {@link TypstEngine.render}. */
   document: Omit<DocumentOptions, "fontSizePt" | "mathMode" | "color">;
 }
 

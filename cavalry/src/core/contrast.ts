@@ -1,7 +1,7 @@
 /**
- * Picking an ink colour that reads against a given background.
+ * Picking an ink color that reads against a given background.
  *
- * Used for the fill colour's default: PPTypst seeds a fresh formula with white
+ * Used for the fill color's default: PPTypst seeds a fresh formula with white
  * on a dark composition and black on a light one, the same call the PowerPoint
  * add-in makes against the slide background.
  */
@@ -9,14 +9,14 @@
 /** Matches "#rgb", "#rgba", "#rrggbb" and "#rrggbbaa" (case-insensitive). */
 const HEX_COLOR = /^#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
 
-/** Whether `value` is a hex colour string this module can read. */
+/** Whether `value` is a hex color string this module can read. */
 export function isHexColor(value: string): boolean {
   return HEX_COLOR.test(value);
 }
 
 /**
  * The RGB channels of `hex` as 0..255 integers, alpha ignored, or `null` when
- * `hex` isn't a recognised hex colour. "#rgb" / "#rgba" shorthand is expanded.
+ * `hex` isn't a recognised hex color. "#rgb" / "#rgba" shorthand is expanded.
  */
 export function parseHexRgb(hex: string): [number, number, number] | null {
   if (!isHexColor(hex)) {
@@ -34,7 +34,7 @@ export function parseHexRgb(hex: string): [number, number, number] | null {
 
 /**
  * Perceived brightness of `hex` on a 0..1 scale (Rec. 601 luma), or `null` for
- * an unreadable colour.
+ * an unreadable color.
  */
 export function perceivedBrightness(hex: string): number | null {
   const rgb = parseHexRgb(hex);
@@ -47,7 +47,7 @@ export function perceivedBrightness(hex: string): number | null {
 
 /**
  * Whether white ink reads better than black on `bgHex`. An unknown or missing
- * colour counts as dark -- Cavalry's default scene and interface are dark, so
+ * color counts as dark -- Cavalry's default scene and interface are dark, so
  * white is the safer guess.
  */
 export function isDarkBackground(bgHex: string | null): boolean {

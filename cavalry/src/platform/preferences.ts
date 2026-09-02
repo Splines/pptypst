@@ -2,7 +2,7 @@
  * The panel's cross-session user preferences, stored via Cavalry's own
  * `api.*PreferenceObject` bucket (the same place the app keeps its settings).
  *
- * The "Only Math" toggle, the fill colour and the font size live here. They
+ * The "Only Math" toggle, the fill color and the font size live here. They
  * make the panel sticky across launches: whatever the user last had (set by
  * hand, or loaded by selecting a formula) is what the next window opens with.
  * The Reset button is what returns them to composition-derived defaults.
@@ -35,7 +35,7 @@ export function saveOnlyMathPreference(onlyMath: boolean): void {
 }
 
 /**
- * The remembered fill colour as a hex string, or `null` when the user has
+ * The remembered fill color as a hex string, or `null` when the user has
  * never set one -- the caller then derives a default from the active
  * composition's background (see `core/contrast.ts`).
  */

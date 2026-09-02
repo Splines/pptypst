@@ -48,7 +48,7 @@ function derivedFontSizePt(): number {
   return defaultFontSizePt(getActiveCompHeightPx(), FONT_SIZE_REFERENCE);
 }
 
-/** Fill colour a fresh formula defaults to: contrast against the comp background. */
+/** Fill color a fresh formula defaults to: contrast against the comp background. */
 function derivedFillColor(): string {
   return contrastInk(getActiveCompBackgroundHex());
 }

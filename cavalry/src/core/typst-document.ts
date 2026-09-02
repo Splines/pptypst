@@ -16,7 +16,7 @@ export interface DocumentOptions {
    */
   mathMode: boolean;
   /**
-   * Fill colour for the text and maths, as a hex string like "#ffffff". Passed
+   * Fill color for the text and maths, as a hex string like "#ffffff". Passed
    * to `#set text(fill: rgb(...))`, so fraction bars, roots and the like pick
    * it up too. A non-hex value falls back to black.
    */

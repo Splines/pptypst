@@ -3,7 +3,7 @@
  *
  * All `ui.*` construction lives here. The panel knows nothing about Typst or
  * the scene — it exposes a small view interface and calls back on user action,
- * so `main.ts` owns what actually happens. Adding controls (e.g. colour) means
+ * so `main.ts` owns what actually happens. Adding controls (e.g. color) means
  * extending {@link Panel} and this file, not the orchestration.
  */
 
@@ -36,14 +36,14 @@ export interface PanelHandlers {
    */
   onMathModeChanged: () => void;
   /**
-   * The user picked a different fill colour. The app re-renders the preview
-   * and, when inserting a fresh formula, remembers the colour as a preference.
+   * The user picked a different fill color. The app re-renders the preview
+   * and, when inserting a fresh formula, remembers the color as a preference.
    */
   onFillColorChanged: () => void;
   /**
-   * The user clicked "Reset". The app restores the size, colour and "Only
+   * The user clicked "Reset". The app restores the size, color and "Only
    * Math" tick to their derived defaults (font size from the composition
-   * height, colour from its background) and, for a fresh insert, forgets the
+   * height, color from its background) and, for a fresh insert, forgets the
    * remembered choices.
    */
   onReset: () => void;
@@ -59,7 +59,7 @@ export interface Panel {
   getMathMode: () => boolean;
   /** Sets the "Only Math" tick and its editor cues without firing the handler. */
   setMathMode: (mathMode: boolean) => void;
-  /** The chosen fill colour as a hex string. */
+  /** The chosen fill color as a hex string. */
   getFillColor: () => string;
   /** Sets the Color chip without firing the handler. */
   setFillColor: (hex: string) => void;
@@ -147,7 +147,7 @@ export function createPanel(handlers: PanelHandlers): Panel {
     },
   });
 
-  // Fill colour for the inserted formula (not the preview strip, which stays a
+  // Fill color for the inserted formula (not the preview strip, which stays a
   // fixed white-on-dark readability check). The real default is seeded by the
   // app from the saved preference or the composition background.
   const colorField = createColorField({

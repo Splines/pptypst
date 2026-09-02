@@ -50,7 +50,7 @@ export const ASSET_FILES = {
 
 /**
  * How the user's source is wrapped into a compilable Typst document. Font
- * size, "Only Math" and the fill colour are not fixed here -- they all come
+ * size, "Only Math" and the fill color are not fixed here -- they all come
  * from the panel (the Size input seeded per {@link FONT_SIZE_REFERENCE}, the
  * "Only Math" checkbox and the Color chip, both seeded from saved preferences
  * or the active composition).

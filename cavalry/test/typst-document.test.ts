@@ -14,11 +14,11 @@ test("applies the configured font size", () => {
   assert.match(buildTypstDocument("x", { ...options, fontSizePt: 42 }), /#set text\(size: 42pt,/);
 });
 
-test("applies the configured fill colour to text and maths", () => {
+test("applies the configured fill color to text and maths", () => {
   assert.match(buildTypstDocument("x", { ...options, color: "#ff8800" }), /fill: rgb\("#ff8800"\)/);
 });
 
-test("falls back to black for a non-hex colour rather than emitting it verbatim", () => {
+test("falls back to black for a non-hex color rather than emitting it verbatim", () => {
   assert.match(buildTypstDocument("x", { ...options, color: "red\") + panic(" }), /fill: rgb\("#000000"\)/);
 });
 

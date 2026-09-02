@@ -37,7 +37,7 @@ test("rejects payloads that are not current-version PPTypst formulas", () => {
     { v: 0, code: "x", fontSize: 28, math: false, color: "#000" }, // older / unknown version
     { v: 1, code: "x", math: false, color: "#000" }, // missing font size
     { v: 1, code: "x", fontSize: 28, color: "#000" }, // missing math flag
-    { v: 1, code: "x", fontSize: 28, math: false }, // missing colour
+    { v: 1, code: "x", fontSize: 28, math: false }, // missing color
     { v: 1, code: "x", fontSize: "28", math: false, color: "#000" }, // wrong type
   ];
   for (const raw of raws) {

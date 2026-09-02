@@ -20,7 +20,7 @@ export interface Formula {
   fontSizePt: number;
   /** Whether {@link source} was wrapped in `$ ... $` before compiling ("Only Math"). */
   mathMode: boolean;
-  /** Fill colour it was rendered with, as a hex string like "#ffffff". */
+  /** Fill color it was rendered with, as a hex string like "#ffffff". */
   color: string;
 }
 

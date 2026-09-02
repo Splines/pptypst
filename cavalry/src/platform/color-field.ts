@@ -20,18 +20,18 @@ const CHIP_HEIGHT = 14;
 export interface ColorFieldOptions {
   /** Caption shown in grey on the left, e.g. "Color". */
   readonly label: string;
-  /** Swatch colour before the app seeds a real default, as "#rrggbb". */
+  /** Swatch color before the app seeds a real default, as "#rrggbb". */
   readonly value: string;
-  /** Called whenever the user picks a different colour. */
+  /** Called whenever the user picks a different color. */
   readonly onChange: () => void;
 }
 
 export interface ColorField {
   /** The widget to hand to `ui.add` (or an enclosing layout). */
   readonly widget: ui.Container;
-  /** Current swatch colour as a hex string. */
+  /** Current swatch color as a hex string. */
   getValue: () => string;
-  /** Sets the swatch colour; does not fire {@link ColorFieldOptions.onChange}. */
+  /** Sets the swatch color; does not fire {@link ColorFieldOptions.onChange}. */
   setValue: (hex: string) => void;
 }
 
@@ -60,7 +60,7 @@ export function createColorField(options: ColorFieldOptions): ColorField {
   container.setFixedHeight(HEIGHT);
   container.setFixedWidth(WIDTH);
   container.setLayout(row);
-  container.setToolTip("Fill colour for the formula");
+  container.setToolTip("Fill color for the formula");
 
   return {
     widget: container,
