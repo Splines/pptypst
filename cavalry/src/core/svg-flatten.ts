@@ -399,10 +399,69 @@ export function flattenTypstSvg(svgSource: string): FlattenResult {
   return { width, height, paths };
 }
 
+export interface FlattenOptions {
+  /**
+   * When the flattened SVG has more than this many visible paths, paths that
+   * share an identical resolved style are merged into a single `<path>` (one
+   * Cavalry layer), kept in first-seen order. Cuts `api.convertSVGToLayers`
+   * time on large figures, at the cost of per-shape editability. Omit (or
+   * `Infinity`) to never merge -- the default.
+   */
+  mergePathsAbove?: number;
+}
+
+type FlatPath = { d: string; style: Style };
+
+/** Distinguishes two resolved styles for merge purposes (see {@link mergeByStyle}). */
+function styleKey(s: Style): string {
+  return `${s.fill} ${s.stroke} ${s.strokeWidth} ${s.fillRule}`;
+}
+
+/**
+ * Collapses `paths` to one entry per distinct style, concatenating the `d` of
+ * every path with that style, in the order the styles first appear.
+ *
+ * This reorders same-style paths relative to each other; that only shows when
+ * two shapes of the *same* paint overlap, where the stacking is invisible
+ * anyway. Different styles never merge, so their relative order (mostly) holds.
+ * Concatenating subpaths under one `fill-rule` can turn an overlap into a hole
+ * with `evenodd`; typst keeps each glyph's holes inside its own single `<path>`
+ * already, and separate glyphs/shapes don't overlap, so this is safe in
+ * practice -- and it only runs on big figures past the caller's threshold.
+ */
+function mergeByStyle(paths: readonly FlatPath[]): FlatPath[] {
+  const buckets = new Map<string, FlatPath>();
+  for (const p of paths) {
+    const key = styleKey(p.style);
+    const existing = buckets.get(key);
+    if (existing) {
+      existing.d += ` ${p.d}`;
+    } else {
+      buckets.set(key, { d: p.d, style: p.style });
+    }
+  }
+  return [...buckets.values()];
+}
+
+/** How many paths {@link serializeFlatSvg} emits before any style merge -- i.e.
+ * the shape count the user sees, and what the caller compares against its
+ * "large figure" threshold. */
+export function countVisiblePaths(result: FlattenResult): number {
+  let n = 0;
+  for (const p of result.paths) {
+    if (p.d.trim() !== "") n++;
+  }
+  return n;
+}
+
 /** Serializes a {@link FlattenResult} into a plain, flat SVG document. */
-export function serializeFlatSvg(result: FlattenResult): string {
-  const body = result.paths
-    .filter(p => p.d.trim() !== "")
+export function serializeFlatSvg(result: FlattenResult, options: FlattenOptions = {}): string {
+  const visible = result.paths.filter(p => p.d.trim() !== "");
+  const emitted = visible.length > (options.mergePathsAbove ?? Infinity)
+    ? mergeByStyle(visible)
+    : visible;
+
+  const body = emitted
     .map((p) => {
       const fill = p.style.fill === "none" ? "none" : p.style.fill || "#000000";
       const stroke = p.style.stroke === "none" ? "none" : p.style.stroke || "none";
@@ -416,6 +475,6 @@ export function serializeFlatSvg(result: FlattenResult): string {
 }
 
 /** Convenience: flatten typst.ts's SVG output into an importer-friendly SVG string. */
-export function flattenSvg(svgSource: string): string {
-  return serializeFlatSvg(flattenTypstSvg(svgSource));
+export function flattenSvg(svgSource: string, options: FlattenOptions = {}): string {
+  return serializeFlatSvg(flattenTypstSvg(svgSource), options);
 }

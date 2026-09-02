@@ -80,6 +80,18 @@ export const LAYER_NAME: LayerNameOptions = {
 /** Name given to every vector layer inside a formula group. */
 export const SHAPE_LAYER_NAME = "Typst Shape";
 
+/**
+ * Above this many flattened paths, `insertFormula` trades per-shape polish for
+ * speed: a cetz figure can be thousands of paths, and `api.convertSVGToLayers`
+ * scales worse than linearly (≈3.8s for 197 layers, measured). Past the
+ * threshold:
+ *   - paths sharing an identical resolved style are merged into one `<path>`
+ *     (one Cavalry layer) before import, in first-seen order;
+ *   - the per-shape rename to {@link SHAPE_LAYER_NAME} is skipped (~1.7ms each).
+ * A normal formula (tens of glyphs) stays one layer per glyph, untouched.
+ */
+export const LARGE_FIGURE_PATH_THRESHOLD = 150;
+
 /** `api.setUserData` key under which a formula's source is stored on its group. */
 export const USER_DATA_KEY = "pptypst";
 

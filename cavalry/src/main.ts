@@ -43,6 +43,18 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+/**
+ * Status line after an insert. When the figure was too big to import as one
+ * layer per shape, `insertFormula` combined same-style paths -- say so, with
+ * the original shape count, so the user knows why the layers look merged.
+ */
+function insertedMessage(replaced: boolean, combinedFromShapes: number | null): string {
+  const base = replaced ? "Updated formula." : "Inserted formula.";
+  return combinedFromShapes === null
+    ? base
+    : `${base} It is made up of ${String(combinedFromShapes)} shapes, which would be too much for a speedy insert, so instead we combined paths with the same style into shared layers.`;
+}
+
 /** Point size a fresh formula defaults to, scaled to the active composition. */
 function derivedFontSizePt(): number {
   return defaultFontSizePt(getActiveCompHeightPx(), FONT_SIZE_REFERENCE);
@@ -142,10 +154,11 @@ async function insert(): Promise<void> {
   setBusy(true);
   try {
     const svg = await engine.render(source, fontSizePt, mathMode, color);
-    editingLayerId = insertFormula({ source, fontSizePt, mathMode, color }, svg, replaces);
+    const inserted = insertFormula({ source, fontSizePt, mathMode, color }, svg, replaces);
+    editingLayerId = inserted.layerId;
     panel.setEditing(true);
     panel.showPreview(svg);
-    panel.showInfo(replaces ? "Updated formula." : "Inserted formula.");
+    panel.showInfo(insertedMessage(replaces !== undefined, inserted.combinedFromShapes));
   } catch (error) {
     console.error("[pptypst] insert failed:", error);
     panel.showError(errorMessage(error));

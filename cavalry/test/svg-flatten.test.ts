@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-import { flattenSvg, flattenTypstSvg } from "../src/core/svg-flatten.ts";
+import { flattenSvg, flattenTypstSvg, serializeFlatSvg } from "../src/core/svg-flatten.ts";
 
 const fixture = (name: string): string =>
   readFileSync(fileURLToPath(new URL(`./fixtures/${name}`, import.meta.url)), "utf8");
@@ -81,4 +81,55 @@ test("expands smooth curves (S) into explicit cubics", () => {
   );
   // The implicit first control point of S is the reflection of (2,2) about (3,3).
   assert.match(paths[0].d, /C 4\.000 4\.000, 5\.000 5\.000, 6\.000 6\.000$/);
+});
+
+/* -------------------------------------------------------------------------- */
+/* serializeFlatSvg style merging                                            */
+/* -------------------------------------------------------------------------- */
+
+// Five paths, two interleaved styles (#000 x3, #f00 x2).
+const INTERLEAVED = flattenTypstSvg(
+  `<svg width="10" height="10">`
+  + `<path d="M0 0 L1 1" fill="#000"/>`
+  + `<path d="M1 1 L2 2" fill="#f00"/>`
+  + `<path d="M2 2 L3 3" fill="#000"/>`
+  + `<path d="M3 3 L4 4" fill="#f00"/>`
+  + `<path d="M4 4 L5 5" fill="#000"/>`
+  + `</svg>`,
+);
+
+const countPaths = (svg: string): number => (svg.match(/<path /g) ?? []).length;
+
+test("serializeFlatSvg keeps one path per shape by default (no merge)", () => {
+  assert.equal(countPaths(serializeFlatSvg(INTERLEAVED)), 5);
+});
+
+test("serializeFlatSvg merges same-style paths once the count passes the threshold", () => {
+  const svg = serializeFlatSvg(INTERLEAVED, { mergePathsAbove: 3 });
+  assert.equal(countPaths(svg), 2); // one #000 path, one #f00 path
+
+  // First-seen style order, and every same-style `d` concatenated into it.
+  assert.match(
+    svg,
+    /<path d="M 0\.000 0\.000 L 1\.000 1\.000 M 2\.000 2\.000 L 3\.000 3\.000 M 4\.000 4\.000 L 5\.000 5\.000" fill="#000"/,
+  );
+  assert.match(
+    svg,
+    /<path d="M 1\.000 1\.000 L 2\.000 2\.000 M 3\.000 3\.000 L 4\.000 4\.000" fill="#f00"/,
+  );
+});
+
+test("serializeFlatSvg does not merge when the count is at or below the threshold", () => {
+  assert.equal(countPaths(serializeFlatSvg(INTERLEAVED, { mergePathsAbove: 5 })), 5);
+  assert.equal(countPaths(serializeFlatSvg(INTERLEAVED, { mergePathsAbove: 4 })), 2);
+});
+
+test("flattenSvg forwards the merge option", () => {
+  const merged = flattenSvg(
+    `<svg width="10" height="10">`
+    + `<path d="M0 0 L1 1" fill="#000"/><path d="M1 1 L2 2" fill="#000"/>`
+    + `<path d="M2 2 L3 3" fill="#000"/></svg>`,
+    { mergePathsAbove: 2 },
+  );
+  assert.equal(countPaths(merged), 1);
 });

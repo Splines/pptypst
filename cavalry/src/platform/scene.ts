@@ -5,14 +5,14 @@
  * All `api.*` scene access lives here.
  */
 
-import { flattenSvg } from "../core/svg-flatten.ts";
+import { countVisiblePaths, flattenTypstSvg, serializeFlatSvg } from "../core/svg-flatten.ts";
 import {
   formulaLayerName,
   parseFormula,
   serializeFormula,
   type Formula,
 } from "../core/formula.ts";
-import { LAYER_NAME, SHAPE_LAYER_NAME, USER_DATA_KEY } from "../config.ts";
+import { LARGE_FIGURE_PATH_THRESHOLD, LAYER_NAME, SHAPE_LAYER_NAME, USER_DATA_KEY } from "../config.ts";
 import { writeTempFile } from "./files.ts";
 
 /** A formula found in the scene, together with the layer carrying it. */
@@ -138,6 +138,17 @@ export function getActiveCompBackgroundHex(): string | null {
   return null;
 }
 
+interface ImportedGroup {
+  groupId: string;
+  /**
+   * The pre-merge shape count when the figure was large enough that same-style
+   * paths were combined into shared layers for import (see
+   * {@link LARGE_FIGURE_PATH_THRESHOLD}); `null` when every shape came in as its
+   * own layer.
+   */
+  combinedFromShapes: number | null;
+}
+
 /**
  * Imports `svg` and returns the id of the single group holding the result.
  *
@@ -147,10 +158,17 @@ export function getActiveCompBackgroundHex(): string | null {
  * around Cavalry's own "SVG Layer N". The vector layers inside are then renamed
  * and flipped by {@link tidyShapeLayers}.
  */
-function importSvgAsGroup(svg: string, name: string): string {
+function importSvgAsGroup(svg: string, name: string): ImportedGroup {
   // typst.ts's SVG needs flattening first; Cavalry's importer cannot resolve
-  // its <use>/<defs> glyph references. See core/svg-flatten.ts.
-  const svgPath = writeTempFile("svg", flattenSvg(svg));
+  // its <use>/<defs> glyph references. See core/svg-flatten.ts. On big figures
+  // (past the threshold) same-style paths are merged into one layer -- the
+  // dominant cost is `api.convertSVGToLayers`, which scales worse than linearly.
+  const flat = flattenTypstSvg(svg);
+  const shapeCount = countVisiblePaths(flat);
+  const combinedFromShapes = shapeCount > LARGE_FIGURE_PATH_THRESHOLD ? shapeCount : null;
+  const svgText = serializeFlatSvg(flat, { mergePathsAbove: LARGE_FIGURE_PATH_THRESHOLD });
+
+  const svgPath = writeTempFile("svg", svgText);
 
   const layerIds = api.convertSVGToLayers(svgPath);
   if (layerIds.length === 0) {
@@ -177,7 +195,7 @@ function importSvgAsGroup(svg: string, name: string): string {
   }
 
   tidyShapeLayers(groupId);
-  return groupId;
+  return { groupId, combinedFromShapes };
 }
 
 /** Every layer nested under `rootId`, at any depth (the root itself excluded). */
@@ -197,15 +215,29 @@ function descendantLayers(rootId: string): string[] {
  * Renames every vector layer in the group to {@link SHAPE_LAYER_NAME} and
  * reverses their stacking, so the shape drawn first in the SVG (Cavalry drops it
  * at the bottom) ends up at the top of the group.
+ *
+ * The rename is skipped for big figures: `api.rename` costs ~1.7ms a call and
+ * there is no bulk form, so on thousands of shapes it is seconds of pure
+ * cosmetics (the layers keep Cavalry's default names; nothing keys off them --
+ * {@link findSelectedFormula} uses user data). The reorder stays: it is ~100x
+ * cheaper per call and fixes z-order for overlapping shapes.
  */
 function tidyShapeLayers(groupId: string): void {
   // `sortLayerIdsByHierarchy` gives top-to-bottom order; the user's stated
   // "first-drawn at the bottom" makes the reverse the SVG paint order.
   const paintOrder = api.sortLayerIdsByHierarchy(api.getChildren(groupId)).reverse();
 
-  for (const id of paintOrder) {
-    api.rename(id, SHAPE_LAYER_NAME);
+  if (paintOrder.length > LARGE_FIGURE_PATH_THRESHOLD) {
+    console.log(
+      `[pptypst] ${String(paintOrder.length)} shapes -- skipping per-shape rename `
+      + `(over ${String(LARGE_FIGURE_PATH_THRESHOLD)})`,
+    );
+  } else {
+    for (const id of paintOrder) {
+      api.rename(id, SHAPE_LAYER_NAME);
+    }
   }
+
   // Chain each layer directly below its predecessor so the final top-to-bottom
   // order is the paint order.
   for (let i = 1; i < paintOrder.length; i++) {
@@ -213,10 +245,21 @@ function tidyShapeLayers(groupId: string): void {
   }
 }
 
+export interface InsertResult {
+  /** The formula group now in the scene (and selected). */
+  layerId: string;
+  /**
+   * Set when the figure was over {@link LARGE_FIGURE_PATH_THRESHOLD} and
+   * same-style paths had to be combined to keep the import feasible: the
+   * pre-merge shape count, for a note in the status line. `null` otherwise.
+   */
+  combinedFromShapes: number | null;
+}
+
 /**
  * Inserts `formula` into the scene as vector layers rendered from `svg`, tags
  * the group *and every shape layer inside it* with the formula, selects the
- * group and returns its id.
+ * group and returns it (with a flag for whether paths had to be combined).
  *
  * The per-shape copies are what let {@link findSelectedFormula} still recognise
  * a formula after the user ungroups it (a common move for finer animation
@@ -229,7 +272,7 @@ function tidyShapeLayers(groupId: string): void {
  * PowerPoint add-in's `calculateCenteredPosition`). The old group's rotation is
  * carried over so a tilted formula stays tilted; scale is not.
  */
-export function insertFormula(formula: Formula, svg: string, replaceLayerId?: string): string {
+export function insertFormula(formula: Formula, svg: string, replaceLayerId?: string): InsertResult {
   const name = formulaLayerName(formula.source, LAYER_NAME);
 
   const toReplace = replaceLayerId !== undefined && api.layerExists(replaceLayerId)
@@ -250,13 +293,13 @@ export function insertFormula(formula: Formula, svg: string, replaceLayerId?: st
     : null;
   const expanded = toReplace ? api.get(toReplace, "hierarchy") === true : false;
 
-  const groupId = importSvgAsGroup(svg, name);
+  const { groupId, combinedFromShapes } = importSvgAsGroup(svg, name);
 
   if (toReplace) {
     api.deleteLayer(toReplace);
   }
-
   api.set(groupId, { hierarchy: expanded });
+
   // Tag the group and every shape inside it with the same payload, so the
   // formula survives being ungrouped (see the doc comment above).
   const payload = serializeFormula(formula);
@@ -283,7 +326,7 @@ export function insertFormula(formula: Formula, svg: string, replaceLayerId?: st
     api.move(oldCentre.x - newCentre.x, oldCentre.y - newCentre.y);
   }
 
-  return groupId;
+  return { layerId: groupId, combinedFromShapes };
 }
 
 /**
