@@ -6,6 +6,7 @@
  */
 
 import { countVisiblePaths, flattenTypstSvg, serializeFlatSvg } from "../core/svg-flatten.ts";
+import { simplifyTypstSvg } from "../core/svg-simple.ts";
 import {
   formulaLayerName,
   parseFormula,
@@ -17,6 +18,7 @@ import {
   LARGE_FIGURE_PATH_THRESHOLD,
   LAYER_NAME,
   SHAPE_LAYER_NAME,
+  USE_SIMPLE_SVG_IMPORT,
   USER_DATA_KEY,
 } from "../config.ts";
 import { writeTempFile } from "./files.ts";
@@ -165,14 +167,22 @@ interface ImportedGroup {
  * and flipped by {@link tidyShapeLayers}.
  */
 function importSvgAsGroup(svg: string, name: string): ImportedGroup {
-  // typst.ts's SVG needs flattening first; Cavalry's importer cannot resolve
-  // its <use>/<defs> glyph references. See core/svg-flatten.ts. On big figures
-  // (past the threshold) same-style paths are merged into one layer -- the
-  // dominant cost is `api.convertSVGToLayers`, which scales worse than linearly.
-  const flat = flattenTypstSvg(svg, { flattenGradientsToSolid: FLATTEN_GRADIENTS_TO_SOLID });
-  const shapeCount = countVisiblePaths(flat);
-  const combinedFromShapes = shapeCount > LARGE_FIGURE_PATH_THRESHOLD ? shapeCount : null;
-  const svgText = serializeFlatSvg(flat, { mergePathsAbove: LARGE_FIGURE_PATH_THRESHOLD });
+  // typst.ts's SVG needs pre-processing first; Cavalry's importer cannot resolve
+  // its <use>/<defs> glyph references. Two implementations, see
+  // {@link USE_SIMPLE_SVG_IMPORT}.
+  let svgText: string;
+  let combinedFromShapes: number | null = null;
+  if (USE_SIMPLE_SVG_IMPORT) {
+    svgText = simplifyTypstSvg(svg);
+  } else {
+    // On big figures (past the threshold) same-style paths are merged into one
+    // layer -- the dominant cost is `api.convertSVGToLayers`, which scales worse
+    // than linearly.
+    const flat = flattenTypstSvg(svg, { flattenGradientsToSolid: FLATTEN_GRADIENTS_TO_SOLID });
+    const shapeCount = countVisiblePaths(flat);
+    combinedFromShapes = shapeCount > LARGE_FIGURE_PATH_THRESHOLD ? shapeCount : null;
+    svgText = serializeFlatSvg(flat, { mergePathsAbove: LARGE_FIGURE_PATH_THRESHOLD });
+  }
 
   const svgPath = writeTempFile("svg", svgText);
 

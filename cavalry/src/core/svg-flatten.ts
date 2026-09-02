@@ -366,6 +366,16 @@ function transformPathData(d: string, m: Matrix): string {
   return out.join(" ");
 }
 
+/** Rewrites a path `d` into the M/L/C/Z (+ best-effort A) subset -- expands
+ * H/V/S/T and degree-elevates every quadratic -- **without moving any point**.
+ * A thin wrapper over {@link transformPathData} for callers that keep the
+ * transform as an attribute rather than baking it in (see `core/svg-simple.ts`).
+ * The `Q` -> `C` elevation is the part that matters: `api.convertSVGToLayers`
+ * mishandles quadratics (hard edge on the closing curve of "$partial$"). */
+export function normalizePathData(d: string): string {
+  return transformPathData(d, IDENTITY);
+}
+
 /* -------------------------------------------------------------------------- */
 /* Minimal SVG tag walker                                                    */
 /* -------------------------------------------------------------------------- */

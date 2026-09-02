@@ -93,6 +93,22 @@ export const SHAPE_LAYER_NAME = "Typst Shape";
 export const LARGE_FIGURE_PATH_THRESHOLD = 150;
 
 /**
+ * Prototype toggle: which SVG pre-processor prepares typst.ts's output for
+ * `api.convertSVGToLayers`.
+ *
+ *   - `false` -- `core/svg-flatten.ts`: bakes every transform into the path
+ *     `d`, needs a full path-data parser. Battle-tested.
+ *   - `true` -- `core/svg-simple.ts`: keeps the transform as a `matrix()`
+ *     attribute instead of baking it into every coordinate; ~1/3rd the code.
+ *     Still elevates quadratics, flattens gradients to solids and folds
+ *     opacity -- the three things `api.convertSVGToLayers` was found not to
+ *     handle -- but with far less path-data math.
+ *
+ * The live preview always uses `svg-flatten.ts` regardless.
+ */
+export const USE_SIMPLE_SVG_IMPORT: boolean = true;
+
+/**
  * How gradient fills (`fill="url(#...)"`, from `gradient.linear(...)` &c. in
  * Typst) are brought into Cavalry.
  *
