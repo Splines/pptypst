@@ -36,6 +36,9 @@ import { createTypstEngine } from "./typst/engine.ts";
 /** How long the editor must be idle before the preview re-renders. */
 const PREVIEW_DEBOUNCE_MS = 0;
 
+/** Shown under the action button when the Size field is left blank. */
+const NO_FONT_SIZE_MESSAGE = "Enter a font size first.";
+
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
@@ -88,7 +91,10 @@ const panel = createPanel({
  * what returns these to composition-derived defaults.
  */
 function rememberSettings(): void {
-  saveFontSizePreference(panel.getFontSizePt());
+  const fontSizePt = panel.getFontSizePt();
+  if (fontSizePt > 0) {
+    saveFontSizePreference(fontSizePt); // don't persist a transiently blank field
+  }
   saveFillColorPreference(panel.getFillColor());
   saveOnlyMathPreference(panel.getMathMode());
 }
@@ -124,6 +130,13 @@ async function insert(): Promise<void> {
   const fontSizePt = panel.getFontSizePt();
   const mathMode = panel.getMathMode();
   const color = panel.getFillColor();
+
+  // Catch a blank Size field here rather than letting a 0pt document reach the
+  // Typst compiler, whose error would be far less obvious.
+  if (!(fontSizePt > 0)) {
+    panel.setStatus(NO_FONT_SIZE_MESSAGE);
+    return;
+  }
 
   setBusy(true);
   try {
@@ -236,6 +249,12 @@ async function refreshPreview(): Promise<void> {
   if (!source) {
     panel.clearPreview();
     showCompileError(null);
+    return;
+  }
+
+  if (!(panel.getFontSizePt() > 0)) {
+    panel.clearPreview();
+    showCompileError(NO_FONT_SIZE_MESSAGE);
     return;
   }
 
