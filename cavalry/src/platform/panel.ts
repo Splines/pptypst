@@ -202,6 +202,28 @@ export function createPanel(handlers: PanelHandlers): Panel {
   const status = new ui.Label("Ready.");
   status.setTextColor(STATUS_INK);
 
+  // A Label can't be selected, but status messages -- Typst compile errors above
+  // all -- are worth pasting elsewhere. Wrap it so a right-click offers "Copy
+  // message", putting the current text on the system clipboard.
+  let statusMessage = "Ready.";
+  const statusLayout = new ui.VLayout();
+  statusLayout.setMargins(0, 0, 0, 0);
+  statusLayout.add(status);
+  const statusBox = new ui.Container();
+  statusBox.setLayout(statusLayout);
+  statusBox.setToolTip("Right-click to copy this message");
+  statusBox.onMousePress = (_position, button) => {
+    if (button === "right" && statusMessage !== "") {
+      ui.showContextMenu();
+    }
+  };
+  ui.addMenuItem({
+    name: "Copy message",
+    onMouseRelease: () => {
+      api.setClipboardText(statusMessage);
+    },
+  });
+
   insertButton.onClick = () => {
     handlers.onInsert();
   };
@@ -234,7 +256,7 @@ export function createPanel(handlers: PanelHandlers): Panel {
   ui.add(mathDelimiters.bottom);
   ui.add(preview.widget);
   ui.add(insertButton);
-  ui.add(status);
+  ui.add(statusBox);
   ui.addStretch();
   ui.setMinimumWidth(360);
   ui.setMaximumHeight(MAX_WINDOW_HEIGHT);
@@ -274,10 +296,12 @@ export function createPanel(handlers: PanelHandlers): Panel {
       colorField.setValue(hex);
     },
     showInfo: (message: string) => {
+      statusMessage = message;
       status.setText(message);
       status.setTextColor(STATUS_INK);
     },
     showError: (message: string) => {
+      statusMessage = message;
       status.setText(message);
       status.setTextColor(STATUS_ERROR_INK);
     },
