@@ -30,10 +30,11 @@ import {
   savePreamblePreference,
 } from "./platform/preferences.ts";
 import {
-  findSelectedFormula,
+  findSelectedFormulas,
   getActiveCompBackgroundHex,
   getActiveCompHeightPx,
   insertFormula,
+  type SceneFormula,
 } from "./platform/scene.ts";
 import { createTypstEngine } from "./typst/engine.ts";
 
@@ -72,6 +73,9 @@ function derivedFillColor(): string {
 const panel = createPanel({
   onInsert: () => {
     void insert();
+  },
+  onBulkUpdate: () => {
+    void bulkUpdate();
   },
   onSelectionChanged: () => {
     syncToSelection();
@@ -138,6 +142,20 @@ const engine = createTypstEngine({
 let editingLayerId: string | null = null;
 
 /**
+ * The formulas the panel is in bulk font-size mode for, or `null` when it is
+ * not (fewer than two selected). Captured on selection so the "Update font
+ * size" button knows what to re-render.
+ */
+let bulkFormulas: SceneFormula[] | null = null;
+
+/**
+ * True while the status line is showing the transient "N formulas selected."
+ * hint, so leaving multi-select can wipe it (but a real message put there since
+ * -- e.g. "Updated N of M ..." -- is left alone).
+ */
+let bulkHintShown = false;
+
+/**
  * True while an insert render is in flight. The preview yields to it (they share
  * the single engine) and selection sync is paused, so a click in the scene
  * can't swap the editor source out from under the insert.
@@ -145,6 +163,10 @@ let editingLayerId: string | null = null;
 let busy = false;
 
 async function insert(): Promise<void> {
+  if (bulkFormulas) {
+    // The Insert button is hidden in multi-select, but guard anyway.
+    return;
+  }
   const source = panel.getSource();
   if (!source) {
     panel.showError("Enter some Typst first.");
@@ -192,10 +214,65 @@ async function insert(): Promise<void> {
 }
 
 /**
- * Mirrors the scene selection into the panel. Selecting an intact PPTypst group
- * loads its source and turns the action into "Update". Selecting a loose "Typst
- * Shape" left behind by ungrouping also loads its settings, but keeps the action
- * as "Insert": rebuilding a whole formula from one glyph (and undoing the user's
+ * Re-renders every formula captured in {@link bulkFormulas} at the font size in
+ * the panel's bulk input, each keeping its own source, preamble, color and math
+ * mode. Each is replaced in place (centre and rotation preserved) by
+ * `insertFormula`.
+ */
+async function bulkUpdate(): Promise<void> {
+  const targets = bulkFormulas;
+  if (!targets || targets.length === 0) {
+    return;
+  }
+
+  const fontSizePt = panel.getBulkFontSizePt();
+  if (!(fontSizePt > 0)) {
+    panel.showError(NO_FONT_SIZE_MESSAGE);
+    return;
+  }
+
+  setBusy(true);
+  let updated = 0;
+  try {
+    for (const { layerId, formula } of targets) {
+      if (!api.layerExists(layerId)) {
+        continue; // deleted since selection
+      }
+      try {
+        const svg = await engine.render(
+          formula.source, formula.preamble, fontSizePt, formula.mathMode, formula.color,
+        );
+        insertFormula({ ...formula, fontSizePt }, svg, layerId);
+        updated++;
+      } catch (error) {
+        console.error("[pptypst] bulk font-size update failed for a formula:", error);
+      }
+    }
+    saveFontSizePreference(fontSizePt);
+    // A real result now, not the transient selection hint -- so the re-sync
+    // below leaves it on screen.
+    bulkHintShown = false;
+    panel.showInfo(
+      `Updated ${String(updated)} of ${String(targets.length)} formulas to ${String(fontSizePt)}pt.`,
+    );
+  } finally {
+    setBusy(false);
+  }
+
+  if (updated > 0) {
+    // `insertFormula` left the last new group selected; reflect that so the
+    // panel drops out of multi-select. An all-failed run keeps its message and
+    // its selection instead.
+    syncToSelection();
+  }
+}
+
+/**
+ * Mirrors the scene selection into the panel. Two or more formulas selected
+ * switches to bulk font-size mode. Selecting an intact PPTypst group loads its
+ * source and turns the action into "Update". Selecting a loose "Typst Shape"
+ * left behind by ungrouping also loads its settings, but keeps the action as
+ * "Insert": rebuilding a whole formula from one glyph (and undoing the user's
  * ungrouping) is not what they want. Selecting anything else leaves the editor
  * as-is and puts the action back to "Insert".
  */
@@ -204,9 +281,33 @@ function syncToSelection(): void {
     return;
   }
 
-  const found = findSelectedFormula();
+  const formulas = findSelectedFormulas();
+  // Bulk mode acts on whole formula groups only; loose "Typst Shape" glyphs
+  // left by ungrouping are for fine animation work, not a size sweep.
+  const groups = formulas.filter(f => f.grouped);
 
-  if (!found) {
+  if (groups.length >= 2) {
+    // Bulk font-size mode: the "Update font size" row replaces the action
+    // button, its input seeded with the first selected formula's size.
+    editingLayerId = null;
+    bulkFormulas = groups;
+    panel.setMultiSelect(true);
+    panel.setBulkFontSizePt(groups[0].formula.fontSizePt);
+    panel.showInfo(`${String(groups.length)} formulas selected.`);
+    bulkHintShown = true;
+    return;
+  }
+
+  bulkFormulas = null;
+  panel.setMultiSelect(false);
+  if (bulkHintShown) {
+    // Leaving multi-select: drop the "N formulas selected." hint (a real
+    // message set since then survives -- see `bulkUpdate`).
+    panel.showInfo("");
+    bulkHintShown = false;
+  }
+
+  if (formulas.length === 0) {
     if (editingLayerId !== null) {
       editingLayerId = null;
       panel.setEditing(false);
@@ -216,6 +317,8 @@ function syncToSelection(): void {
     }
     return;
   }
+
+  const found = formulas[0];
 
   if (found.grouped && found.layerId === editingLayerId) {
     // Already editing this one (e.g. the group we just inserted and selected);

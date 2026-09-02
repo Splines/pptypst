@@ -29,7 +29,7 @@ export interface SceneFormula {
   grouped: boolean;
 }
 
-/** How far up the hierarchy `findSelectedFormula` looks for a tagged layer. */
+/** How far up the hierarchy `findSelectedFormulas` looks for a tagged layer. */
 const MAX_ANCESTOR_DEPTH = 32;
 
 /**
@@ -330,13 +330,20 @@ export function insertFormula(formula: Formula, svg: string, replaceLayerId?: st
 }
 
 /**
- * Searches the current selection, and each selected layer's ancestors, for one
- * tagged with a PPTypst formula. Returns the match for the first selected layer
- * that has one, resolved to the *outermost* tagged ancestor -- so clicking a
- * glyph inside an intact formula edits the whole group, while a glyph left loose
- * by ungrouping resolves to itself (see {@link SceneFormula.grouped}).
+ * Every distinct PPTypst formula in the current selection, in selection order.
+ *
+ * Each selected layer is walked up its ancestors for a formula tag, resolved to
+ * the *outermost* tagged one -- so clicking a glyph inside an intact formula
+ * yields the whole group, while a glyph left loose by ungrouping yields itself
+ * (see {@link SceneFormula.grouped}). A formula reached through several selected
+ * layers is returned once.
+ *
+ * The panel loads a single result for editing; two or more switch it into
+ * bulk font-size mode.
  */
-export function findSelectedFormula(): SceneFormula | null {
+export function findSelectedFormulas(): SceneFormula[] {
+  const seen = new Set<string>();
+  const found: SceneFormula[] = [];
   for (const selected of api.getSelection()) {
     let match: { layerId: string; formula: Formula } | null = null;
     let current = selected;
@@ -349,11 +356,12 @@ export function findSelectedFormula(): SceneFormula | null {
       }
       current = api.getParent(current);
     }
-    if (match) {
+    if (match && !seen.has(match.layerId)) {
+      seen.add(match.layerId);
       // A live formula group still holds its shape layers; a lone "Typst Shape"
       // dropped by ungrouping has no children.
-      return { ...match, grouped: api.getChildren(match.layerId).length > 0 };
+      found.push({ ...match, grouped: api.getChildren(match.layerId).length > 0 });
     }
   }
-  return null;
+  return found;
 }

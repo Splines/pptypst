@@ -11,6 +11,11 @@ and turns the button into **Update**, which replaces that formula in place (the
 new group re-centred on the old one's centre); with nothing PPTypst selected the
 button reverts to **Insert** and creates a fresh group.
 
+Selecting two or more formula groups swaps the button for a font-size input
+(seeded from the first) and an **Update font size** button, which re-renders
+each selected formula at that size while keeping its own source, preamble, color
+and math mode.
+
 A collapsible **preamble** editor sits under the source, for `#import` / `#let`
 lines compiled ahead of the body (`$ ... $` wrapping never touches it). Following
 the PowerPoint add-in: with nothing selected it is the **Global preamble**, the

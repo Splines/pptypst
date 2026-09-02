@@ -46,8 +46,15 @@ const PREAMBLE_EDITOR_DEFAULT_HEIGHT = 112;
 export interface PanelHandlers {
   onInsert: () => void;
   /**
+   * The "Update font size" button (shown while several formulas are selected)
+   * was clicked. The app re-renders every selected formula with its own source,
+   * colour and math mode but the size from {@link Panel.getBulkFontSizePt}.
+   */
+  onBulkUpdate: () => void;
+  /**
    * The scene selection changed. The panel does not know what is selected —
-   * the app inspects the scene and calls back with {@link Panel.setEditing}.
+   * the app inspects the scene and calls back with {@link Panel.setEditing} /
+   * {@link Panel.setMultiSelect}.
    */
   onSelectionChanged: () => void;
   /** The editor text changed; the app re-renders the live preview. */
@@ -96,6 +103,10 @@ export interface Panel {
   setPreambleOpen: (open: boolean) => void;
   getFontSizePt: () => number;
   setFontSizePt: (fontSizePt: number) => void;
+  /** The font size in the bulk row's own input (shown only in multi-select). */
+  getBulkFontSizePt: () => number;
+  /** Seeds the bulk row's input, normally with the first selected formula's size. */
+  setBulkFontSizePt: (fontSizePt: number) => void;
   /** Whether "Only Math" is ticked, i.e. the source is wrapped in `$ ... $`. */
   getMathMode: () => boolean;
   /** Sets the "Only Math" tick and its editor cues without firing the handler. */
@@ -117,6 +128,12 @@ export interface Panel {
    * preamble" otherwise.
    */
   setEditing: (editing: boolean) => void;
+  /**
+   * Enters (`true`) or  (`false`) multi-select mode: the "Insert" /
+   * "Update" button is swleavesapped for a row holding a font-size input and an
+   * "Update font size" button (see {@link PanelHandlers.onBulkUpdate}).
+   */
+  setMultiSelect: (active: boolean) => void;
   /** Repaints the live preview from raw typst.ts SVG. */
   showPreview: (svg: string) => void;
   /** Clears the live preview. */
@@ -331,6 +348,35 @@ export function createPanel(handlers: PanelHandlers): Panel {
   // in the vertical centre rather than riding high in the box.
   insertButton.setFixedHeight(30);
   insertButton.setContentsMargins(0, 0, 0, 0);
+
+  // Multi-select action: a font-size input and an "Update font size" button
+  // that takes its place while several formulas are selected. Its input is
+  // separate from the top "Size" field (that one drives single insert/update).
+  const bulkSizeField = createSizeField({
+    label: "Size",
+    value: MIN_FONT_SIZE_PT,
+    min: MIN_FONT_SIZE_PT,
+    max: MAX_FONT_SIZE_PT,
+    onChange: () => {
+      /* no live preview in bulk mode; the value is read on button press */
+    },
+  });
+  const bulkButton = new ui.Button("Update font size");
+  bulkButton.setFixedHeight(30);
+  bulkButton.setContentsMargins(0, 0, 0, 0);
+  bulkButton.setToolTip("Re-render every selected formula at this font size, keeping its own text, color and math mode");
+  bulkButton.onClick = () => {
+    handlers.onBulkUpdate();
+  };
+  const bulkRow = new ui.HLayout();
+  bulkRow.setMargins(0, 0, 0, 0);
+  bulkRow.add(bulkSizeField.widget);
+  bulkRow.addSpacing(8);
+  bulkRow.add(bulkButton);
+  const bulkBox = new ui.Container();
+  bulkBox.setLayout(bulkRow);
+  bulkBox.setHidden(true);
+
   // Opens on "Loading..." -- `main.ts` warms up the wasm engine on show and
   // flips this to "Ready." when it finishes.
   const status = new ui.Label("Loading...");
@@ -393,6 +439,7 @@ export function createPanel(handlers: PanelHandlers): Panel {
   ui.add(preambleGrip.widget);
   ui.add(preview.widget);
   ui.add(insertButton);
+  ui.add(bulkBox);
   ui.add(statusBox);
   ui.addStretch();
   ui.setMinimumWidth(360);
@@ -476,6 +523,10 @@ export function createPanel(handlers: PanelHandlers): Panel {
     setFontSizePt: (fontSizePt: number) => {
       fontSizeField.setValue(fontSizePt);
     },
+    getBulkFontSizePt: () => bulkSizeField.getValue(),
+    setBulkFontSizePt: (fontSizePt: number) => {
+      bulkSizeField.setValue(fontSizePt);
+    },
     getMathMode: () => mathModeCheckbox.getValue(),
     setMathMode: (mathMode: boolean) => {
       mathModeCheckbox.setValue(mathMode);
@@ -500,10 +551,19 @@ export function createPanel(handlers: PanelHandlers): Panel {
     },
     setBusy: (busy: boolean) => {
       insertButton.setEnabled(!busy);
+      bulkButton.setEnabled(!busy);
     },
     setEditing: (editing: boolean) => {
       insertButton.setText(editing ? "Update" : "Insert");
       applyPreambleScope(editing);
+    },
+    setMultiSelect: (active: boolean) => {
+      insertButton.setHidden(active);
+      bulkBox.setHidden(!active);
+      // A preamble only makes sense per formula; keep the field from looking
+      // editable while several are selected.
+      preambleEditor.setReadOnly(active);
+      syncScrollbarGutter();
     },
     showPreview: preview.show,
     clearPreview: preview.clear,
