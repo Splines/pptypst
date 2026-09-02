@@ -35,8 +35,12 @@ const PREAMBLE_UI = {
     "Belongs to the selected formula; saved back onto it when you press Update.",
 } as const;
 
-/** The preamble editor's height when expanded, in pixels (a few lines). */
-const PREAMBLE_EDITOR_HEIGHT = 56;
+/**
+ * The preamble editor's height when first expanded, in pixels -- roughly double
+ * the source editor's, since a preamble is usually several `#import` / `#let`
+ * lines. Draggable via its own grip, within the shared editor min/max.
+ */
+const PREAMBLE_EDITOR_DEFAULT_HEIGHT = 112;
 
 /** Actions the panel reports; implemented by the composition root. */
 export interface PanelHandlers {
@@ -184,11 +188,20 @@ export function createPanel(handlers: PanelHandlers): Panel {
   const preambleEditor = new ui.MultiLineEdit();
   preambleEditor.setFontSize(EDITOR_FONT_SIZE_PX);
   preambleEditor.setPlaceholder(`Typst preamble, e.g.  ${EXAMPLE_PREAMBLE}`);
-  preambleEditor.setFixedHeight(PREAMBLE_EDITOR_HEIGHT);
-  preambleEditor.setHidden(true);
   preambleEditor.onValueChanged = () => {
     handlers.onPreambleChanged();
   };
+
+  // Its own grab bar, like the source editor's -- `createResizeGrip` pins the
+  // starting height. Both it and the editor are hidden while the section is
+  // collapsed (see `applyPreambleOpen`).
+  const preambleGrip = createResizeGrip(preambleEditor, {
+    defaultHeight: PREAMBLE_EDITOR_DEFAULT_HEIGHT,
+    minHeight: EDITOR_MIN_HEIGHT,
+    maxHeight: EDITOR_MAX_HEIGHT,
+  });
+  preambleEditor.setHidden(true);
+  preambleGrip.widget.setHidden(true);
 
   let preambleOpen = false;
   let preambleShapeScope = false;
@@ -213,6 +226,7 @@ export function createPanel(handlers: PanelHandlers): Panel {
   const applyPreambleOpen = (open: boolean): void => {
     preambleOpen = open;
     preambleEditor.setHidden(!open);
+    preambleGrip.widget.setHidden(!open);
     refreshPreambleSummary();
   };
 
@@ -349,6 +363,7 @@ export function createPanel(handlers: PanelHandlers): Panel {
   ui.add(mathDelimiters.bottom);
   ui.add(preambleSummaryBox);
   ui.add(preambleEditor);
+  ui.add(preambleGrip.widget);
   ui.add(preview.widget);
   ui.add(insertButton);
   ui.add(statusBox);
@@ -364,11 +379,13 @@ export function createPanel(handlers: PanelHandlers): Panel {
     const width = panelWidth();
     preview.setWidth(width);
     editorGrip.setWidth(width);
+    preambleGrip.setWidth(width);
   };
 
   ui.show();
   preview.setWidth(panelWidth());
   editorGrip.setWidth(panelWidth());
+  preambleGrip.setWidth(panelWidth());
   applyMathModeCues(mathModeCheckbox.getValue());
 
   return {
