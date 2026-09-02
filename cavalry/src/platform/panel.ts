@@ -63,7 +63,10 @@ export interface Panel {
   getFillColor: () => string;
   /** Sets the Color chip without firing the handler. */
   setFillColor: (hex: string) => void;
-  setStatus: (message: string) => void;
+  /** Shows an informational message under the action button, in the normal ink. */
+  showInfo: (message: string) => void;
+  /** Shows an error message under the action button, in bright red. */
+  showError: (message: string) => void;
   /** Disables the actions while a render is in flight. */
   setBusy: (busy: boolean) => void;
   /**
@@ -98,6 +101,10 @@ const EDITOR_MAX_HEIGHT = 280;
 const MAX_WINDOW_HEIGHT = 680;
 /** Editor text size, in pixels; the toolkit default is too small to read comfortably. */
 const EDITOR_FONT_SIZE_PX = 18;
+
+/** Status-line ink: near-white for normal messages, bright red for errors. */
+const STATUS_INK = "#e6e6e6";
+const STATUS_ERROR_INK = "#ff5c5c";
 
 export function createPanel(handlers: PanelHandlers): Panel {
   ui.setTitle("PPTypst");
@@ -193,6 +200,7 @@ export function createPanel(handlers: PanelHandlers): Panel {
   insertButton.setFixedHeight(30);
   insertButton.setContentsMargins(0, 0, 0, 0);
   const status = new ui.Label("Ready.");
+  status.setTextColor(STATUS_INK);
 
   insertButton.onClick = () => {
     handlers.onInsert();
@@ -265,8 +273,13 @@ export function createPanel(handlers: PanelHandlers): Panel {
     setFillColor: (hex: string) => {
       colorField.setValue(hex);
     },
-    setStatus: (message: string) => {
+    showInfo: (message: string) => {
       status.setText(message);
+      status.setTextColor(STATUS_INK);
+    },
+    showError: (message: string) => {
+      status.setText(message);
+      status.setTextColor(STATUS_ERROR_INK);
     },
     setBusy: (busy: boolean) => {
       insertButton.setEnabled(!busy);

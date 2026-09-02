@@ -118,7 +118,7 @@ let busy = false;
 async function insert(): Promise<void> {
   const source = panel.getSource();
   if (!source) {
-    panel.setStatus("Enter some Typst first.");
+    panel.showError("Enter some Typst first.");
     return;
   }
 
@@ -134,7 +134,7 @@ async function insert(): Promise<void> {
   // Catch a blank Size field here rather than letting a 0pt document reach the
   // Typst compiler, whose error would be far less obvious.
   if (!(fontSizePt > 0)) {
-    panel.setStatus(NO_FONT_SIZE_MESSAGE);
+    panel.showError(NO_FONT_SIZE_MESSAGE);
     return;
   }
 
@@ -144,10 +144,10 @@ async function insert(): Promise<void> {
     editingLayerId = insertFormula({ source, fontSizePt, mathMode, color }, svg, replaces);
     panel.setEditing(true);
     panel.showPreview(svg);
-    panel.setStatus(replaces ? "Updated formula." : "Inserted formula.");
+    panel.showInfo(replaces ? "Updated formula." : "Inserted formula.");
   } catch (error) {
     console.error("[pptypst] insert failed:", error);
-    panel.setStatus(errorMessage(error));
+    panel.showError(errorMessage(error));
   } finally {
     setBusy(false);
     void refreshPreview(); // catch up if the text changed mid-insert
@@ -224,10 +224,10 @@ let previewErrorShown = false;
 function showCompileError(message: string | null): void {
   if (message !== null) {
     previewErrorShown = true;
-    panel.setStatus(message);
+    panel.showError(message);
   } else if (previewErrorShown) {
     previewErrorShown = false;
-    panel.setStatus("");
+    panel.showInfo("");
   }
 }
 
