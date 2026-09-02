@@ -15,13 +15,21 @@ import {
 import { LAYER_NAME, SHAPE_LAYER_NAME, USER_DATA_KEY } from "../config.ts";
 import { writeTempFile } from "./files.ts";
 
-/** A formula found in the scene, together with the group carrying it. */
+/** A formula found in the scene, together with the layer carrying it. */
 export interface SceneFormula {
   layerId: string;
   formula: Formula;
+  /**
+   * `true` when {@link layerId} is the formula's own group -- selecting it means
+   * an edit replaces the whole thing. `false` when it is a lone "Typst Shape"
+   * left behind after the user ungrouped the formula for finer animation
+   * control: the panel then loads its settings but a button press inserts a
+   * fresh formula rather than trying to rebuild it from a single glyph.
+   */
+  grouped: boolean;
 }
 
-/** How far up the hierarchy `findSelectedFormula` looks for a tagged group. */
+/** How far up the hierarchy `findSelectedFormula` looks for a tagged layer. */
 const MAX_ANCESTOR_DEPTH = 32;
 
 /**
@@ -172,6 +180,19 @@ function importSvgAsGroup(svg: string, name: string): string {
   return groupId;
 }
 
+/** Every layer nested under `rootId`, at any depth (the root itself excluded). */
+function descendantLayers(rootId: string): string[] {
+  const out: string[] = [];
+  const walk = (id: string): void => {
+    for (const child of api.getChildren(id)) {
+      out.push(child);
+      walk(child);
+    }
+  };
+  walk(rootId);
+  return out;
+}
+
 /**
  * Renames every vector layer in the group to {@link SHAPE_LAYER_NAME} and
  * reverses their stacking, so the shape drawn first in the SVG (Cavalry drops it
@@ -194,7 +215,13 @@ function tidyShapeLayers(groupId: string): void {
 
 /**
  * Inserts `formula` into the scene as vector layers rendered from `svg`, tags
- * the resulting group with the formula source, selects it and returns its id.
+ * the group *and every shape layer inside it* with the formula, selects the
+ * group and returns its id.
+ *
+ * The per-shape copies are what let {@link findSelectedFormula} still recognise
+ * a formula after the user ungroups it (a common move for finer animation
+ * control): each loose "Typst Shape" then carries the source, colour and size
+ * on its own.
  *
  * When `replaceLayerId` refers to a layer that still exists it is deleted, so
  * editing a formula replaces it rather than stacking a copy on top, and the new
@@ -230,7 +257,13 @@ export function insertFormula(formula: Formula, svg: string, replaceLayerId?: st
   }
 
   api.set(groupId, { hierarchy: expanded });
-  api.setUserData(groupId, USER_DATA_KEY, serializeFormula(formula));
+  // Tag the group and every shape inside it with the same payload, so the
+  // formula survives being ungrouped (see the doc comment above).
+  const payload = serializeFormula(formula);
+  api.setUserData(groupId, USER_DATA_KEY, payload);
+  for (const shape of descendantLayers(groupId)) {
+    api.setUserData(shape, USER_DATA_KEY, payload);
+  }
   api.select([groupId]);
 
   // Rotate before re-centring: the centre alignment below measures the new
@@ -254,20 +287,29 @@ export function insertFormula(formula: Formula, svg: string, replaceLayerId?: st
 }
 
 /**
- * Searches the current selection, and each selected layer's ancestors, for a
- * group tagged with a PPTypst formula. Returns the first match.
+ * Searches the current selection, and each selected layer's ancestors, for one
+ * tagged with a PPTypst formula. Returns the match for the first selected layer
+ * that has one, resolved to the *outermost* tagged ancestor -- so clicking a
+ * glyph inside an intact formula edits the whole group, while a glyph left loose
+ * by ungrouping resolves to itself (see {@link SceneFormula.grouped}).
  */
 export function findSelectedFormula(): SceneFormula | null {
   for (const selected of api.getSelection()) {
+    let match: { layerId: string; formula: Formula } | null = null;
     let current = selected;
     for (let depth = 0; depth < MAX_ANCESTOR_DEPTH && current; depth++) {
       if (api.hasUserDataKey(current, USER_DATA_KEY)) {
         const formula = parseFormula(api.getUserDataKey(current, USER_DATA_KEY));
         if (formula) {
-          return { layerId: current, formula };
+          match = { layerId: current, formula }; // keep climbing to the outermost
         }
       }
       current = api.getParent(current);
+    }
+    if (match) {
+      // A live formula group still holds its shape layers; a lone "Typst Shape"
+      // dropped by ungrouping has no children.
+      return { ...match, grouped: api.getChildren(match.layerId).length > 0 };
     }
   }
   return null;

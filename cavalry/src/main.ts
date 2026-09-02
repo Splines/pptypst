@@ -142,10 +142,12 @@ async function insert(): Promise<void> {
 }
 
 /**
- * Mirrors the scene selection into the panel: selecting a PPTypst group loads
- * its source and turns the action into "Update"; selecting anything else (or
- * nothing) leaves the editor as-is and puts the action back to "Insert", which
- * then creates a fresh group.
+ * Mirrors the scene selection into the panel. Selecting an intact PPTypst group
+ * loads its source and turns the action into "Update". Selecting a loose "Typst
+ * Shape" left behind by ungrouping also loads its settings, but keeps the action
+ * as "Insert": rebuilding a whole formula from one glyph (and undoing the user's
+ * ungrouping) is not what they want. Selecting anything else leaves the editor
+ * as-is and puts the action back to "Insert".
  */
 function syncToSelection(): void {
   if (busy) {
@@ -162,19 +164,22 @@ function syncToSelection(): void {
     return;
   }
 
-  if (found.layerId === editingLayerId) {
+  if (found.grouped && found.layerId === editingLayerId) {
     // Already editing this one (e.g. the group we just inserted and selected);
     // don't reload and clobber any edits in progress.
     panel.setEditing(true);
     return;
   }
 
-  editingLayerId = found.layerId;
   panel.setFontSizePt(found.formula.fontSizePt);
   panel.setMathMode(found.formula.mathMode);
   panel.setFillColor(found.formula.color);
   panel.setSource(found.formula.source); // fires onSourceChanged -> schedulePreview
-  panel.setEditing(true);
+
+  // Only an intact group can be updated in place; a loose glyph loads read-only
+  // and a button press inserts a fresh formula.
+  editingLayerId = found.grouped ? found.layerId : null;
+  panel.setEditing(found.grouped);
 }
 
 /* -------------------------------------------------------------------------- */
