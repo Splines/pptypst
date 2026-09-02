@@ -14,7 +14,7 @@
 import { ASSET_FILES, DOCUMENT, FONT_SIZE_REFERENCE } from "./config.ts";
 import { contrastInk } from "./core/contrast.ts";
 import { defaultFontSizePt } from "./core/font-size.ts";
-import { createAssetReader } from "./platform/files.ts";
+import { createAssetReader, createPackageStore } from "./platform/files.ts";
 import { createPanel } from "./platform/panel.ts";
 import {
   DEFAULT_ONLY_MATH,
@@ -101,6 +101,7 @@ function rememberSettings(): void {
 
 const engine = createTypstEngine({
   assets: createAssetReader(),
+  packages: createPackageStore(),
   files: ASSET_FILES,
   document: DOCUMENT,
 });

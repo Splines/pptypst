@@ -26,6 +26,13 @@ export const ASSET_DIR_OVERRIDE: string
 /** Folder name looked for next to an installed script when no override is set. */
 export const ASSET_DIR_CONVENTION = "pptypst_assets/vendor";
 
+/**
+ * Folder name -- a sibling of `vendor/` inside `pptypst_assets/` -- where Typst
+ * Universe packages (`#import "@preview/..."`) are cached after their first
+ * download. Resolved to an absolute path by `platform/files.ts`.
+ */
+export const PACKAGE_CACHE_DIR_NAME = "packages";
+
 /** Files expected inside the resolved asset directory (see `npm run assets`). */
 export const ASSET_FILES = {
   compilerWasm: "typst_ts_web_compiler_bg.wasm",

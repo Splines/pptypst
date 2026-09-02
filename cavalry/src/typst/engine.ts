@@ -9,13 +9,16 @@ import {
 import {
   loadFonts,
   withAccessModel,
+  withPackageRegistry,
 } from "@myriaddreamin/typst.ts/dist/esm/options.init.mjs";
 import { MemoryAccessModel } from "@myriaddreamin/typst.ts/dist/esm/fs/memory.mjs";
+import { NodeFetchPackageRegistry } from "@myriaddreamin/typst.ts/dist/esm/fs/package.node.mjs";
 
 import * as compilerWrapper from "@myriaddreamin/typst-ts-web-compiler";
 import * as rendererWrapper from "@myriaddreamin/typst-ts-renderer";
 
 import type { AssetReader } from "../core/assets.ts";
+import { type PackageStore, packageRequest } from "../core/packages.ts";
 import { buildTypstDocument, type DocumentOptions } from "../core/typst-document.ts";
 
 /**
@@ -26,7 +29,10 @@ import { buildTypstDocument, type DocumentOptions } from "../core/typst-document
  *   - wasm modules and fonts come from disk as bytes (via {@link AssetReader})
  *     rather than being fetched, handed to typst.ts through `getModule`;
  *   - the wasm-bindgen wrappers are supplied through `getWrapper`, so typst.ts
- *     never reaches its dynamic `import()` path.
+ *     never reaches its dynamic `import()` path;
+ *   - `@preview/...` packages are downloaded with `api.WebClient` and cached on
+ *     disk (via {@link PackageStore}), since Cavalry has no `XMLHttpRequest`
+ *     for the browser registry's synchronous fetch.
  *
  * Cavalry's engine runs JS microtasks but never settles the host promise from
  * async `WebAssembly.instantiate` / `.compile`, so both modules are
@@ -48,6 +54,8 @@ export interface TypstAssetFiles {
 
 export interface TypstEngineOptions {
   assets: AssetReader;
+  /** On-disk cache + downloader for `@preview/...` Typst Universe packages. */
+  packages: PackageStore;
   files: TypstAssetFiles;
   /** Font size, math mode and color are per-render (panel controls); see {@link TypstEngine.render}. */
   document: Omit<DocumentOptions, "fontSizePt" | "mathMode" | "color">;
@@ -78,7 +86,7 @@ function formatDiagnostics(diagnostics: readonly unknown[]): string {
 }
 
 export function createTypstEngine(options: TypstEngineOptions): TypstEngine {
-  const { assets, files, document } = options;
+  const { assets, packages, files, document } = options;
 
   let compiler: any = null;
   let renderer: any = null;
@@ -120,6 +128,7 @@ export function createTypstEngine(options: TypstEngineOptions): TypstEngine {
       instantiateWasm(rendererWrapper, rendererWasm, files.rendererWasm);
 
       compiler = createTypstCompiler();
+      const accessModel = new MemoryAccessModel();
       await compiler.init({
         getWrapper: () => Promise.resolve(compilerWrapper),
         getModule: () => compilerWasm,
@@ -128,7 +137,16 @@ export function createTypstEngine(options: TypstEngineOptions): TypstEngine {
           // wasm instance -- a separate font builder would instantiate the
           // 28 MiB module a second time.
           loadFonts(fonts, { assets: false }),
-          withAccessModel(new MemoryAccessModel()),
+          withAccessModel(accessModel),
+          // Resolves `#import "@preview/..."`: NodeFetchPackageRegistry does the
+          // untar + access-model plumbing; `packageRequest` is the synchronous
+          // "fetch" it calls, served from the on-disk package cache.
+          withPackageRegistry(
+            new NodeFetchPackageRegistry(
+              accessModel,
+              (method: string, url: string) => packageRequest(packages, method, url),
+            ),
+          ),
         ],
       });
 

@@ -48,6 +48,23 @@ pptypst_assets/vendor/   (wasm + fonts)
 The `pptypst_assets` folder is hidden from the Scripts menu by its `_assets`
 suffix. To update, extract a fresh zip over the old files.
 
+### Typst Universe packages
+
+`#import "@preview/…"` works. The first time a package is used, its tarball is
+downloaded from `packages.typst.org` and cached under
+`pptypst_assets/packages/` (next to `vendor/`); every later compile reads it
+straight from disk. Cavalry asks once for permission to use the network the
+first time a download happens.
+
+```typ
+#import "@preview/physica:0.9.8": *
+$ pdv(x, y) $
+```
+
+Only the `@preview` namespace is supported, and only a package registry — custom
+fonts still come solely from `vendor/`. The cache is safe to delete; it just
+re-downloads. It is not part of `PPTypst.zip`.
+
 ### JavaScript-Editor dev loop
 
 `ui.scriptLocation` is blank when a script is pasted rather than run from the
@@ -76,12 +93,13 @@ src/
     assets.ts           AssetReader port (implemented by platform/files.ts)
     base64.ts           base64 → bytes (Cavalry has no atob)
     formula.ts          what a formula is, how it is stored, how it is named
+    packages.ts         PackageStore port + URL→cache-key, serve-from-cache logic
     svg-flatten.ts      typst.ts SVG → SVG that Cavalry can import
     svg-path.ts         normalized path `d` string → structured verbs
     typst-document.ts   wraps the user's source into a compilable document
 
   platform/             Cavalry adapter — all api.*/ui.* access lives here
-    files.ts            asset directory resolution, binary reads, temp files
+    files.ts            asset dir + package cache, binary reads, downloads, temp files
     panel.ts            the window: widgets, layout, wording
     preview.ts          the live preview swatch (ui.Draw + cavalry.Path)
     scene.ts            SVG → named, tagged group; finding it again
@@ -91,7 +109,7 @@ src/
     polyfills.ts        globals Cavalry's engine lacks (side-effect import)
 ```
 
-Three things about the engine are load-bearing and easy to break:
+Four things about the engine are load-bearing and easy to break:
 
 1. **`polyfills.ts` must be imported first** in `engine.ts`, before the
    `@myriaddreamin/*` imports. The wasm glue constructs a `TextDecoder` while
@@ -99,7 +117,11 @@ Three things about the engine are load-bearing and easy to break:
 2. **The wasm is instantiated synchronously** via wasm-bindgen's `initSync`.
    Cavalry runs JS microtasks but never settles the host promise from async
    `WebAssembly.instantiate`, so the async path hangs forever.
-3. **Fonts are passed as bytes through `beforeBuild`**, keeping a single 28 MiB
+3. **`@preview` packages are resolved synchronously.** typst.ts's package
+   registry expects a blocking fetch; `api.WebClient` provides one, and
+   `core/packages.ts` caches every tarball under `pptypst_assets/packages/` so a
+   package is downloaded at most once.
+4. **Fonts are passed as bytes through `beforeBuild`**, keeping a single 28 MiB
    compiler instance. A separate font builder instantiates it a second time.
 
 ### Why `svg-flatten.ts`
@@ -137,6 +159,8 @@ inside Cavalry before it ships.
 
 - The script is not self-contained; it reads `pptypst_assets/vendor/` from next
   to itself at runtime, so it must be installed as a folder (not pasted).
-- Typst package imports (`#import "@preview/…"`) are unsupported (no registry).
+- Package imports need network access on first use (then cached); packages
+  outside the `@preview` namespace and custom package-provided fonts are not
+  supported.
 - Updating a formula deletes and recreates it. The new group is re-centred on
   the old one's centre, but its rotation and scale are not carried over.
