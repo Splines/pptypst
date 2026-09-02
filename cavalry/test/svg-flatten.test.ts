@@ -11,8 +11,9 @@ const fixture = (name: string): string =>
 test("reproduces the golden flattening of real typst.ts output", () => {
   // Regression guard: `fixtures/typst-output.svg` is genuine typst.ts "vector
   // format" output for `$ integral_0^1 x^2 dif x = 1/3 $`, and `flattened.svg`
-  // is what Cavalry successfully imports. Any change to the flattener that
-  // alters this output is a behaviour change and must be re-verified in Cavalry.
+  // is what Cavalry imports. Any change to the flattener that alters this output
+  // is a behaviour change and must be re-verified in Cavalry. (The fixture was
+  // regenerated when quadratics started being degree-elevated to cubics.)
   assert.equal(flattenSvg(fixture("typst-output.svg")), fixture("flattened.svg"));
 });
 
@@ -81,6 +82,32 @@ test("expands smooth curves (S) into explicit cubics", () => {
   );
   // The implicit first control point of S is the reflection of (2,2) about (3,3).
   assert.match(paths[0].d, /C 4\.000 4\.000, 5\.000 5\.000, 6\.000 6\.000$/);
+});
+
+test("degree-elevates quadratics (Q) to cubics -- Cavalry's importer mishandles Q", () => {
+  // A quadratic p0=(0,0) control=(3,0) p2=(3,3) elevates exactly to a cubic
+  // with controls p0 + 2/3(c-p0) = (2,0) and p2 + 2/3(c-p2) = (3,1).
+  const { paths } = flattenTypstSvg(
+    `<svg width="4" height="4"><path d="M 0 0 Q 3 0, 3 3" fill="#000"/></svg>`,
+  );
+  assert.doesNotMatch(paths[0].d, /Q/);
+  assert.equal(paths[0].d, "M 0.000 0.000 C 2.000 0.000, 3.000 1.000, 3.000 3.000");
+});
+
+test("degree-elevates smooth quadratics (T) to cubics too", () => {
+  const { paths } = flattenTypstSvg(
+    `<svg width="4" height="4"><path d="M 0 0 Q 1 1, 2 2 T 4 4" fill="#000"/></svg>`,
+  );
+  assert.doesNotMatch(paths[0].d, /Q/);
+  // T's implicit control is the reflection of (1,1) about (2,2) => (3,3);
+  // elevating p0=(2,2) c=(3,3) p2=(4,4): controls (2.667,2.667) and (3.333,3.333).
+  assert.match(paths[0].d, /C 2\.667 2\.667, 3\.333 3\.333, 4\.000 4\.000$/);
+});
+
+test("emits no quadratics for a real glyph outline (typst fonts are all-quadratic)", () => {
+  const d = flattenTypstSvg(fixture("typst-output.svg")).paths.map(p => p.d).join(" ");
+  assert.doesNotMatch(d, /Q/);
+  assert.match(d, /C /);
 });
 
 /* -------------------------------------------------------------------------- */

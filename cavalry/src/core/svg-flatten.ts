@@ -192,8 +192,25 @@ function parseTransform(str: string | undefined): Matrix {
   return result;
 }
 
+/** Degree-elevates a quadratic Bezier (`p0` -> control `qc` -> `p2`) to the
+ * equivalent cubic's two control points. Exact -- same curve, no sampling. */
+function quadToCubicControls(
+  p0x: number, p0y: number, qcx: number, qcy: number, p2x: number, p2y: number,
+): [number, number, number, number] {
+  return [
+    p0x + (2 / 3) * (qcx - p0x),
+    p0y + (2 / 3) * (qcy - p0y),
+    p2x + (2 / 3) * (qcx - p2x),
+    p2y + (2 / 3) * (qcy - p2y),
+  ];
+}
+
 /** Transforms an SVG path `d` string, baking `m` into every coordinate. Expands
- * H/V/S/T so the output only ever uses M/L/C/Q/Z (plus best-effort A). */
+ * H/V/S/T and degree-elevates every quadratic, so the output only ever uses
+ * M/L/C/Z (plus best-effort A). Quadratics are elevated because Cavalry's
+ * `api.convertSVGToLayers` mishandles a `Q` that ends on the subpath's start
+ * point (it drops the segment, leaving a straight chord -- visible as a hard
+ * edge on e.g. the closing curve of "$partial$"); cubic import is reliable. */
 function transformPathData(d: string, m: Matrix): string {
   const cmdRe = /([MmLlHhVvCcSsQqTtAaZz])([^MmLlHhVvCcSsQqTtAaZz]*)/g;
   const numRe = /-?(?:\d+\.\d+|\.\d+|\d+)(?:[eE][-+]?\d+)?/g;
@@ -298,7 +315,8 @@ function transformPathData(d: string, m: Matrix): string {
       while (i < nums.length) {
         const [x1, y1] = nextPoint();
         const [x, y] = nextPoint();
-        out.push(`Q ${emitPoint(x1, y1)}, ${emitPoint(x, y)}`);
+        const [c1x, c1y, c2x, c2y] = quadToCubicControls(cx, cy, x1, y1, x, y);
+        out.push(`C ${emitPoint(c1x, c1y)}, ${emitPoint(c2x, c2y)}, ${emitPoint(x, y)}`);
         cx = x;
         cy = y;
         prevQuadCtrl = [x1, y1];
@@ -308,7 +326,8 @@ function transformPathData(d: string, m: Matrix): string {
       while (i < nums.length) {
         const [x1, y1] = reflectControlPoint([cx, cy], prevQuadCtrl);
         const [x, y] = nextPoint();
-        out.push(`Q ${emitPoint(x1, y1)}, ${emitPoint(x, y)}`);
+        const [c1x, c1y, c2x, c2y] = quadToCubicControls(cx, cy, x1, y1, x, y);
+        out.push(`C ${emitPoint(c1x, c1y)}, ${emitPoint(c2x, c2y)}, ${emitPoint(x, y)}`);
         cx = x;
         cy = y;
         prevQuadCtrl = [x1, y1];

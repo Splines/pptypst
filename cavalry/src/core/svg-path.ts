@@ -2,11 +2,13 @@
  * Parses the *normalized* path `d` strings produced by
  * {@link import("./svg-flatten.ts").flattenTypstSvg} into structured verbs.
  *
- * That flattener already expands every command into absolute `M`/`L`/`C`/`Q`/`Z`
- * (arcs are never emitted for glyph or shape outlines), space-separated with a
- * comma between the point groups of a curve. So the grammar here is tiny: a verb
- * letter followed by a fixed number of coordinates. Anything else -- a stray `A`
- * and its numbers -- is skipped rather than guessed at.
+ * That flattener already expands every command into absolute `M`/`L`/`C`/`Z`
+ * (quadratics are degree-elevated to cubics; arcs are never emitted for glyph or
+ * shape outlines), space-separated with a comma between the point groups of a
+ * curve. So the grammar here is tiny: a verb letter followed by a fixed number
+ * of coordinates. `Q` is still accepted in case a caller feeds raw SVG, but the
+ * flattener no longer produces it; anything else -- a stray `A` and its numbers
+ * -- is skipped rather than guessed at.
  *
  * Kept free of any `cavalry.*` access so it can be unit-tested on Node; the
  * platform layer turns these verbs into a `cavalry.Path`.
