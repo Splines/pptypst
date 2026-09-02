@@ -199,13 +199,15 @@ export function createPanel(handlers: PanelHandlers): Panel {
   // in the vertical centre rather than riding high in the box.
   insertButton.setFixedHeight(30);
   insertButton.setContentsMargins(0, 0, 0, 0);
-  const status = new ui.Label("Ready.");
+  // Opens on "Loading..." -- `main.ts` warms up the wasm engine on show and
+  // flips this to "Ready." when it finishes.
+  const status = new ui.Label("Loading...");
   status.setTextColor(STATUS_INK);
 
   // A Label can't be selected, but status messages -- Typst compile errors above
   // all -- are worth pasting elsewhere. Wrap it so a right-click offers "Copy
   // message", putting the current text on the system clipboard.
-  let statusMessage = "Ready.";
+  let statusMessage = "Loading...";
   const statusLayout = new ui.VLayout();
   statusLayout.setMargins(0, 0, 0, 0);
   statusLayout.add(status);

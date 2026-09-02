@@ -54,6 +54,13 @@ export interface TypstEngineOptions {
 }
 
 export interface TypstEngine {
+  /**
+   * Loads the wasm modules and fonts. Called for you by {@link TypstEngine.render}
+   * on first use; call it directly to warm up (e.g. on window open) so the wait
+   * happens before the user types. Idempotent; a failed load is retried on the
+   * next call.
+   */
+  init(): Promise<void>;
   /** Compiles Typst `source` to an SVG string, initialising on first use. */
   render(source: string, fontSizePt: number, mathMode: boolean, color: string): Promise<string>;
 }
@@ -140,6 +147,7 @@ export function createTypstEngine(options: TypstEngineOptions): TypstEngine {
   }
 
   return {
+    init: initOnce,
     async render(source: string, fontSizePt: number, mathMode: boolean, color: string): Promise<string> {
       await initOnce();
 

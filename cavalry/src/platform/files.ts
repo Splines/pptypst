@@ -45,7 +45,7 @@ export function createAssetReader(assetDir = resolveAssetDir()): AssetReader {
           api.isDirectory(assetDir)
             ? `PPTypst asset file is missing: ${path}`
             : `PPTypst assets folder not found at "${assetDir}". Copy the `
-              + `"pptypst_assets" folder next to the installed script (see README).`,
+              + `"pptypst_assets" folder next to the installed script.`,
         );
       }
       const base64 = api.encodeBinary(path);

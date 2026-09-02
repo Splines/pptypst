@@ -294,3 +294,16 @@ panel.setMathMode(loadOnlyMathPreference());
 panel.setFillColor(loadFillColorPreference() ?? derivedFillColor());
 syncToSelection();
 schedulePreview();
+
+// Load the wasm compiler and fonts now rather than on the first keystroke. The
+// status line opens on "Loading..." (see panel.ts); flip it to "Ready." once the
+// engine is up, or show why it failed.
+void engine.init().then(
+  () => {
+    panel.showInfo("Ready.");
+  },
+  (error: unknown) => {
+    console.error("[pptypst] engine init failed:", error);
+    panel.showError(errorMessage(error));
+  },
+);
