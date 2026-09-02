@@ -17,6 +17,26 @@ import { createSizeField } from "./size-field.ts";
 const EXAMPLE_SOURCE = "$ integral_0^1 x^2 dif x = 1/3 $";
 /** Placeholder while "Only Math" is on: the `$ ... $` is added for the user. */
 const EXAMPLE_SOURCE_MATH = "integral_0^1 x^2 dif x = 1/3";
+/** Placeholder in the preamble editor. */
+const EXAMPLE_PREAMBLE = '#import "@preview/physica:0.9.8": *';
+
+/**
+ * Preamble section wording, following the PowerPoint add-in's `PREAMBLE_UI`.
+ * The label switches with scope: with nothing being edited the field is the
+ * "Global preamble" (the default for new formulas); with a formula group
+ * selected it is that formula's own "Shape preamble".
+ */
+const PREAMBLE_UI = {
+  GLOBAL_LABEL: "Global preamble",
+  SHAPE_LABEL: "Shape preamble",
+  GLOBAL_TITLE:
+    "Compiled before every new formula. Formulas already in the scene keep their own preamble until you update them.",
+  SHAPE_TITLE:
+    "Belongs to the selected formula; saved back onto it when you press Update.",
+} as const;
+
+/** The preamble editor's height when expanded, in pixels (a few lines). */
+const PREAMBLE_EDITOR_HEIGHT = 56;
 
 /** Actions the panel reports; implemented by the composition root. */
 export interface PanelHandlers {
@@ -28,6 +48,17 @@ export interface PanelHandlers {
   onSelectionChanged: () => void;
   /** The editor text changed; the app re-renders the live preview. */
   onSourceChanged: () => void;
+  /**
+   * The preamble editor text changed. The app re-renders the preview and, when
+   * nothing is being edited (global scope), remembers it as the default for
+   * new formulas.
+   */
+  onPreambleChanged: () => void;
+  /**
+   * The user expanded (`true`) or collapsed (`false`) the preamble section.
+   * The app remembers the state for next launch.
+   */
+  onPreambleToggled: (open: boolean) => void;
   /** The Size input changed; the app re-renders the live preview. */
   onFontSizeChanged: () => void;
   /**
@@ -53,6 +84,12 @@ export interface PanelHandlers {
 export interface Panel {
   getSource: () => string;
   setSource: (source: string) => void;
+  /** The preamble editor text, trimmed. */
+  getPreamble: () => string;
+  /** Sets the preamble editor text (fires {@link PanelHandlers.onPreambleChanged}). */
+  setPreamble: (preamble: string) => void;
+  /** Expands or collapses the preamble section without firing a handler. */
+  setPreambleOpen: (open: boolean) => void;
   getFontSizePt: () => number;
   setFontSizePt: (fontSizePt: number) => void;
   /** Whether "Only Math" is ticked, i.e. the source is wrapped in `$ ... $`. */
@@ -71,7 +108,9 @@ export interface Panel {
   setBusy: (busy: boolean) => void;
   /**
    * Switches the primary action between inserting a fresh formula ("Insert")
-   * and replacing the one currently selected in the scene ("Update").
+   * and replacing the one currently selected in the scene ("Update"), and with
+   * it the preamble section's scope: "Shape preamble" while editing, "Global
+   * preamble" otherwise.
    */
   setEditing: (editing: boolean) => void;
   /** Repaints the live preview from raw typst.ts SVG. */
@@ -136,6 +175,58 @@ export function createPanel(handlers: PanelHandlers): Panel {
   });
 
   const preview = createPreview();
+
+  // Collapsible preamble editor: `#import` / `#let` lines compiled ahead of the
+  // body. A summary row (a Label in a pressable Container, the same affordance
+  // as "Only Math" above) toggles it; the editor itself is hidden when
+  // collapsed. Its label -- "Global preamble" vs "Shape preamble" -- follows the
+  // editing state, set from `setEditing` via `applyPreambleScope`.
+  const preambleEditor = new ui.MultiLineEdit();
+  preambleEditor.setFontSize(EDITOR_FONT_SIZE_PX);
+  preambleEditor.setPlaceholder(`Typst preamble, e.g.  ${EXAMPLE_PREAMBLE}`);
+  preambleEditor.setFixedHeight(PREAMBLE_EDITOR_HEIGHT);
+  preambleEditor.setHidden(true);
+  preambleEditor.onValueChanged = () => {
+    handlers.onPreambleChanged();
+  };
+
+  let preambleOpen = false;
+  let preambleShapeScope = false;
+
+  const preambleSummary = new ui.Label("");
+  preambleSummary.setFontSize(11);
+  const preambleSummaryRow = new ui.HLayout();
+  preambleSummaryRow.setMargins(2, 4, 2, 4);
+  preambleSummaryRow.add(preambleSummary);
+  preambleSummaryRow.addStretch();
+  const preambleSummaryBox = new ui.Container();
+  preambleSummaryBox.setLayout(preambleSummaryRow);
+
+  const refreshPreambleSummary = (): void => {
+    const label = preambleShapeScope ? PREAMBLE_UI.SHAPE_LABEL : PREAMBLE_UI.GLOBAL_LABEL;
+    preambleSummary.setText(`${preambleOpen ? "▾" : "▸"}  ${label}`);
+    preambleSummaryBox.setToolTip(
+      preambleShapeScope ? PREAMBLE_UI.SHAPE_TITLE : PREAMBLE_UI.GLOBAL_TITLE,
+    );
+  };
+
+  const applyPreambleOpen = (open: boolean): void => {
+    preambleOpen = open;
+    preambleEditor.setHidden(!open);
+    refreshPreambleSummary();
+  };
+
+  const applyPreambleScope = (shapeScope: boolean): void => {
+    preambleShapeScope = shapeScope;
+    refreshPreambleSummary();
+  };
+
+  preambleSummaryBox.onMousePress = () => {
+    applyPreambleOpen(!preambleOpen);
+    handlers.onPreambleToggled(preambleOpen);
+  };
+
+  refreshPreambleSummary(); // fill the label before the window is shown
 
   const fontSizeField = createSizeField({
     label: "Size",
@@ -256,6 +347,8 @@ export function createPanel(handlers: PanelHandlers): Panel {
   ui.add(editor);
   ui.add(editorGrip.widget);
   ui.add(mathDelimiters.bottom);
+  ui.add(preambleSummaryBox);
+  ui.add(preambleEditor);
   ui.add(preview.widget);
   ui.add(insertButton);
   ui.add(statusBox);
@@ -282,6 +375,13 @@ export function createPanel(handlers: PanelHandlers): Panel {
     getSource: () => editor.getText().trim(),
     setSource: (source: string) => {
       editor.setText(source);
+    },
+    getPreamble: () => preambleEditor.getText().trim(),
+    setPreamble: (preamble: string) => {
+      preambleEditor.setText(preamble);
+    },
+    setPreambleOpen: (open: boolean) => {
+      applyPreambleOpen(open);
     },
     getFontSizePt: () => fontSizeField.getValue(),
     setFontSizePt: (fontSizePt: number) => {
@@ -312,6 +412,7 @@ export function createPanel(handlers: PanelHandlers): Panel {
     },
     setEditing: (editing: boolean) => {
       insertButton.setText(editing ? "Update" : "Insert");
+      applyPreambleScope(editing);
     },
     showPreview: preview.show,
     clearPreview: preview.clear,

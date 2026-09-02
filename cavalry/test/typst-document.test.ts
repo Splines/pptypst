@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 
 import { buildTypstDocument } from "../src/core/typst-document.ts";
 
-const options = { fontSizePt: 28, mathMode: false, color: "#000000" };
+const options = { preamble: "", fontSizePt: 28, mathMode: false, color: "#000000" };
 
 test("sets an auto-sized, unfilled page so the SVG is a tight bounding box", () => {
   const doc = buildTypstDocument("x", options);
@@ -30,4 +30,24 @@ test("inserts the source verbatim when math mode is off", () => {
 test("wraps the source in display math when math mode is on", () => {
   const doc = buildTypstDocument("a + b", { ...options, mathMode: true });
   assert.ok(doc.endsWith("$\na + b\n$"));
+});
+
+test("omits the preamble entirely when it is empty", () => {
+  const doc = buildTypstDocument("x", options);
+  assert.ok(doc.endsWith(")\nx"), doc); // #set text(...) newline then straight into the body
+});
+
+test("prepends the preamble before the body, separated by a newline", () => {
+  const doc = buildTypstDocument("x", { ...options, preamble: '#import "@preview/physica:0.9.8": *' });
+  assert.ok(doc.endsWith('#import "@preview/physica:0.9.8": *\nx'), doc);
+});
+
+test("does not add a second newline when the preamble already ends in one", () => {
+  const doc = buildTypstDocument("x", { ...options, preamble: "#let a = 1\n" });
+  assert.ok(doc.endsWith("#let a = 1\nx"), doc);
+});
+
+test("wraps only the body in display math, leaving the preamble outside it", () => {
+  const doc = buildTypstDocument("a + b", { ...options, preamble: "#let f(x) = x", mathMode: true });
+  assert.ok(doc.endsWith("#let f(x) = x\n$\na + b\n$"), doc);
 });

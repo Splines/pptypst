@@ -21,9 +21,13 @@ import {
   loadFillColorPreference,
   loadFontSizePreference,
   loadOnlyMathPreference,
+  loadPreambleOpenPreference,
+  loadPreamblePreference,
   saveFillColorPreference,
   saveFontSizePreference,
   saveOnlyMathPreference,
+  savePreambleOpenPreference,
+  savePreamblePreference,
 } from "./platform/preferences.ts";
 import {
   findSelectedFormula,
@@ -74,6 +78,18 @@ const panel = createPanel({
   },
   onSourceChanged: () => {
     schedulePreview();
+  },
+  onPreambleChanged: () => {
+    // Global scope (nothing being edited): the field IS the default for new
+    // formulas, so keep the saved copy in step as the user types. In shape
+    // scope the preamble rides along on the formula and is saved by `insert`.
+    if (editingLayerId === null) {
+      savePreamblePreference(panel.getPreamble());
+    }
+    schedulePreview();
+  },
+  onPreambleToggled: (open: boolean) => {
+    savePreambleOpenPreference(open);
   },
   onFontSizeChanged: () => {
     rememberSettings();
@@ -140,6 +156,7 @@ async function insert(): Promise<void> {
     ? editingLayerId
     : undefined;
 
+  const preamble = panel.getPreamble();
   const fontSizePt = panel.getFontSizePt();
   const mathMode = panel.getMathMode();
   const color = panel.getFillColor();
@@ -153,9 +170,15 @@ async function insert(): Promise<void> {
 
   setBusy(true);
   try {
-    const svg = await engine.render(source, fontSizePt, mathMode, color);
-    const inserted = insertFormula({ source, fontSizePt, mathMode, color }, svg, replaces);
+    const svg = await engine.render(source, preamble, fontSizePt, mathMode, color);
+    const inserted = insertFormula({ source, preamble, fontSizePt, mathMode, color }, svg, replaces);
     editingLayerId = inserted.layerId;
+    if (replaces === undefined) {
+      // A fresh insert: the preamble it used becomes the default for the next
+      // one. An update leaves the global default alone -- the preamble is now
+      // stored on that formula.
+      savePreamblePreference(preamble);
+    }
     panel.setEditing(true);
     panel.showPreview(svg);
     panel.showInfo(insertedMessage(replaces !== undefined, inserted.combinedFromShapes));
@@ -187,6 +210,9 @@ function syncToSelection(): void {
     if (editingLayerId !== null) {
       editingLayerId = null;
       panel.setEditing(false);
+      // Leaving a formula: the preamble field goes back to the global default
+      // so a shape-specific preamble does not linger as if it were global.
+      panel.setPreamble(loadPreamblePreference());
     }
     return;
   }
@@ -198,18 +224,21 @@ function syncToSelection(): void {
     return;
   }
 
+  // Only an intact group can be updated in place; a loose glyph loads read-only
+  // and a button press inserts a fresh formula. Set this first so the preamble
+  // section shows the right scope before its text is loaded below (and so
+  // `onPreambleChanged` sees the correct scope if `setPreamble` fires it).
+  editingLayerId = found.grouped ? found.layerId : null;
+  panel.setEditing(found.grouped);
+
   panel.setFontSizePt(found.formula.fontSizePt);
   panel.setMathMode(found.formula.mathMode);
   panel.setFillColor(found.formula.color);
+  panel.setPreamble(found.formula.preamble);
   panel.setSource(found.formula.source); // fires onSourceChanged -> schedulePreview
-  // The panel setters above fire no handlers, so persist here: the last object
-  // the user touched becomes what the next launch opens with.
+  // The Size / Math / Color setters above fire no handlers, so persist here:
+  // the last object the user touched becomes what the next launch opens with.
   rememberSettings();
-
-  // Only an intact group can be updated in place; a loose glyph loads read-only
-  // and a button press inserts a fresh formula.
-  editingLayerId = found.grouped ? found.layerId : null;
-  panel.setEditing(found.grouped);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -275,7 +304,7 @@ async function refreshPreview(): Promise<void> {
   previewRendering = true;
   try {
     const svg = await engine.render(
-      source, panel.getFontSizePt(), panel.getMathMode(), panel.getFillColor(),
+      source, panel.getPreamble(), panel.getFontSizePt(), panel.getMathMode(), panel.getFillColor(),
     );
     panel.showPreview(svg);
     showCompileError(null);
@@ -306,6 +335,8 @@ function setBusy(value: boolean): void {
 panel.setFontSizePt(loadFontSizePreference() ?? derivedFontSizePt());
 panel.setMathMode(loadOnlyMathPreference());
 panel.setFillColor(loadFillColorPreference() ?? derivedFillColor());
+panel.setPreambleOpen(loadPreambleOpenPreference());
+panel.setPreamble(loadPreamblePreference()); // global default; a selection below may override
 syncToSelection();
 schedulePreview();
 

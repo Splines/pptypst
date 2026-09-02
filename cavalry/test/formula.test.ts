@@ -11,17 +11,25 @@ import {
 const naming = { maxSourceChars: 20 };
 
 test("round-trips a formula through the stored payload", () => {
-  const formula = { source: "integral_0^1 x^2 dif x", fontSizePt: 42, mathMode: true, color: "#ffffff" };
+  const formula = {
+    source: "integral_0^1 x^2 dif x",
+    preamble: '#import "@preview/physica:0.9.8": *',
+    fontSizePt: 42,
+    mathMode: true,
+    color: "#ffffff",
+  };
   assert.deepEqual(parseFormula(serializeFormula(formula)), formula);
 });
 
-test("round-trips a formula with 'Only Math' off", () => {
-  const formula = { source: "$ x $", fontSizePt: 28, mathMode: false, color: "#1a1a1a" };
+test("round-trips a formula with 'Only Math' off and an empty preamble", () => {
+  const formula = { source: "$ x $", preamble: "", fontSizePt: 28, mathMode: false, color: "#1a1a1a" };
   assert.deepEqual(parseFormula(serializeFormula(formula)), formula);
 });
 
 test("stamps the payload with the format version", () => {
-  const stored = serializeFormula({ source: "x", fontSizePt: 28, mathMode: false, color: "#000000" });
+  const stored = serializeFormula({
+    source: "x", preamble: "", fontSizePt: 28, mathMode: false, color: "#000000",
+  });
   assert.equal((stored as { v: number }).v, FORMULA_VERSION);
 });
 
@@ -32,13 +40,14 @@ test("rejects payloads that are not current-version PPTypst formulas", () => {
     42,
     "text",
     {},
-    { v: 1 },
+    { v: FORMULA_VERSION },
     { code: 7 },
-    { v: 0, code: "x", fontSize: 28, math: false, color: "#000" }, // older / unknown version
-    { v: 1, code: "x", math: false, color: "#000" }, // missing font size
-    { v: 1, code: "x", fontSize: 28, color: "#000" }, // missing math flag
-    { v: 1, code: "x", fontSize: 28, math: false }, // missing color
-    { v: 1, code: "x", fontSize: "28", math: false, color: "#000" }, // wrong type
+    { v: 0, code: "x", preamble: "", fontSize: 28, math: false, color: "#000" }, // unknown version
+    { v: FORMULA_VERSION, code: "x", fontSize: 28, math: false, color: "#000" }, // missing preamble
+    { v: FORMULA_VERSION, code: "x", preamble: "", math: false, color: "#000" }, // missing font size
+    { v: FORMULA_VERSION, code: "x", preamble: "", fontSize: 28, color: "#000" }, // missing math flag
+    { v: FORMULA_VERSION, code: "x", preamble: "", fontSize: 28, math: false }, // missing color
+    { v: FORMULA_VERSION, code: "x", preamble: 7, fontSize: 28, math: false, color: "#000" }, // wrong type
   ];
   for (const raw of raws) {
     assert.equal(parseFormula(raw), null, JSON.stringify(raw));

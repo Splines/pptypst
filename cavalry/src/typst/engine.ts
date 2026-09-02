@@ -57,8 +57,8 @@ export interface TypstEngineOptions {
   /** On-disk cache + downloader for `@preview/...` Typst Universe packages. */
   packages: PackageStore;
   files: TypstAssetFiles;
-  /** Font size, math mode and color are per-render (panel controls); see {@link TypstEngine.render}. */
-  document: Omit<DocumentOptions, "fontSizePt" | "mathMode" | "color">;
+  /** Preamble, font size, math mode and color are per-render (panel controls); see {@link TypstEngine.render}. */
+  document: Omit<DocumentOptions, "preamble" | "fontSizePt" | "mathMode" | "color">;
 }
 
 export interface TypstEngine {
@@ -69,8 +69,13 @@ export interface TypstEngine {
    * next call.
    */
   init(): Promise<void>;
-  /** Compiles Typst `source` to an SVG string, initialising on first use. */
-  render(source: string, fontSizePt: number, mathMode: boolean, color: string): Promise<string>;
+  /**
+   * Compiles Typst to an SVG string, initialising on first use. `preamble` is
+   * prepended to `source` (see {@link buildTypstDocument}); pass `""` for none.
+   */
+  render(
+    source: string, preamble: string, fontSizePt: number, mathMode: boolean, color: string,
+  ): Promise<string>;
 }
 
 const MAIN_FILE = "/main.typ";
@@ -166,12 +171,17 @@ export function createTypstEngine(options: TypstEngineOptions): TypstEngine {
 
   return {
     init: initOnce,
-    async render(source: string, fontSizePt: number, mathMode: boolean, color: string): Promise<string> {
+    async render(
+      source: string, preamble: string, fontSizePt: number, mathMode: boolean, color: string,
+    ): Promise<string> {
       await initOnce();
 
       // Typst compiles + renders in well under a second, so there is no
       // progress to report here -- only failures surface, as thrown errors.
-      compiler.addSource(MAIN_FILE, buildTypstDocument(source, { ...document, fontSizePt, mathMode, color }));
+      compiler.addSource(
+        MAIN_FILE,
+        buildTypstDocument(source, { ...document, preamble, fontSizePt, mathMode, color }),
+      );
       const response = await compiler.compile({ mainFilePath: MAIN_FILE });
       const diagnostics: unknown = response.diagnostics;
       if (Array.isArray(diagnostics) && diagnostics.length > 0) {

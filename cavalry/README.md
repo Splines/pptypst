@@ -11,6 +11,13 @@ and turns the button into **Update**, which replaces that formula in place (the
 new group re-centred on the old one's centre); with nothing PPTypst selected the
 button reverts to **Insert** and creates a fresh group.
 
+A collapsible **preamble** editor sits under the source, for `#import` / `#let`
+lines compiled ahead of the body (`$ ... $` wrapping never touches it). Following
+the PowerPoint add-in: with nothing selected it is the **Global preamble**, the
+default for new formulas, remembered across sessions; with a formula selected it
+is that formula's own **Shape preamble**, stored on the group and saved on
+**Update**.
+
 ## Build
 
 ```bash
