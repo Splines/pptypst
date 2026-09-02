@@ -92,6 +92,21 @@ export const SHAPE_LAYER_NAME = "Typst Shape";
  */
 export const LARGE_FIGURE_PATH_THRESHOLD = 150;
 
+/**
+ * How gradient fills (`fill="url(#...)"`, from `gradient.linear(...)` &c. in
+ * Typst) are brought into Cavalry.
+ *
+ *   - `true` -- flatten each gradient to a single flat color (the
+ *     coverage-weighted average of its stops), with any transparency folded
+ *     into `fill-opacity`. Lossy but always renders, mirroring the PowerPoint
+ *     add-in giving up on true gradient import.
+ *   - `false` -- keep the gradient: `core/svg-flatten.ts` re-emits it in the
+ *     handed-off SVG's own `<defs>`, transformed to match the flattened path.
+ *     Only worthwhile once `api.convertSVGToLayers` is confirmed to honour
+ *     `<linearGradient>` / `<radialGradient>` on an imported shape.
+ */
+export const FLATTEN_GRADIENTS_TO_SOLID = true;
+
 /** `api.setUserData` key under which a formula's source is stored on its group. */
 export const USER_DATA_KEY = "pptypst";
 

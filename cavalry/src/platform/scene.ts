@@ -12,7 +12,13 @@ import {
   serializeFormula,
   type Formula,
 } from "../core/formula.ts";
-import { LARGE_FIGURE_PATH_THRESHOLD, LAYER_NAME, SHAPE_LAYER_NAME, USER_DATA_KEY } from "../config.ts";
+import {
+  FLATTEN_GRADIENTS_TO_SOLID,
+  LARGE_FIGURE_PATH_THRESHOLD,
+  LAYER_NAME,
+  SHAPE_LAYER_NAME,
+  USER_DATA_KEY,
+} from "../config.ts";
 import { writeTempFile } from "./files.ts";
 
 /** A formula found in the scene, together with the layer carrying it. */
@@ -163,7 +169,7 @@ function importSvgAsGroup(svg: string, name: string): ImportedGroup {
   // its <use>/<defs> glyph references. See core/svg-flatten.ts. On big figures
   // (past the threshold) same-style paths are merged into one layer -- the
   // dominant cost is `api.convertSVGToLayers`, which scales worse than linearly.
-  const flat = flattenTypstSvg(svg);
+  const flat = flattenTypstSvg(svg, { flattenGradientsToSolid: FLATTEN_GRADIENTS_TO_SOLID });
   const shapeCount = countVisiblePaths(flat);
   const combinedFromShapes = shapeCount > LARGE_FIGURE_PATH_THRESHOLD ? shapeCount : null;
   const svgText = serializeFlatSvg(flat, { mergePathsAbove: LARGE_FIGURE_PATH_THRESHOLD });

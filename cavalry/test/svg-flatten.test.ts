@@ -124,6 +124,95 @@ test("serializeFlatSvg does not merge when the count is at or below the threshol
   assert.equal(countPaths(serializeFlatSvg(INTERLEAVED, { mergePathsAbove: 4 })), 2);
 });
 
+/* -------------------------------------------------------------------------- */
+/* opacity + alpha-color normalization (mirrors web/src/svg.ts)              */
+/* -------------------------------------------------------------------------- */
+
+test("splits an #RRGGBBAA fill into an opaque color plus fill-opacity", () => {
+  const svg = `<svg width="4" height="4"><path d="M0 0 L1 1" fill="#ff000080"/></svg>`;
+  assert.match(flattenSvg(svg), /fill="#ff0000" fill-opacity="0\.502"/);
+});
+
+test("splits #RGBA shorthand and rgba() the same way", () => {
+  const short = flattenSvg(`<svg width="4" height="4"><path d="M0 0 L1 1" fill="#f008"/></svg>`);
+  assert.match(short, /fill="#ff0000" fill-opacity="0\.5333"/);
+
+  const rgba = flattenSvg(
+    `<svg width="4" height="4"><path d="M0 0 L1 1" fill="rgba(0, 128, 0, 0.4)"/></svg>`,
+  );
+  assert.match(rgba, /fill="#008000" fill-opacity="0\.4"/);
+});
+
+test("folds a group's opacity into both fill and stroke opacity of the leaf", () => {
+  const svg = `<svg width="4" height="4">`
+    + `<g opacity="0.5"><path d="M0 0 L1 1" fill="#000" fill-opacity="0.4" `
+    + `stroke="#000" stroke-width="1" stroke-opacity="0.6"/></g></svg>`;
+  const out = flattenSvg(svg);
+  assert.match(out, /fill-opacity="0\.2"/); // 0.5 * 0.4
+  assert.match(out, /stroke-opacity="0\.3"/); // 0.5 * 0.6
+});
+
+test("omits *-opacity attributes when everything is fully opaque (golden format unchanged)", () => {
+  const svg = `<svg width="4" height="4"><path d="M0 0 L1 1" fill="#000"/></svg>`;
+  const out = flattenSvg(svg);
+  assert.doesNotMatch(out, /opacity/);
+});
+
+test("same color, different opacity are kept as separate merged buckets", () => {
+  const svg = `<svg width="10" height="10">`
+    + `<path d="M0 0 L1 1" fill="#000"/>`
+    + `<path d="M1 1 L2 2" fill="#00000080"/>`
+    + `<path d="M2 2 L3 3" fill="#000"/></svg>`;
+  assert.equal((flattenSvg(svg, { mergePathsAbove: 2 }).match(/<path /g) ?? []).length, 2);
+});
+
+/* -------------------------------------------------------------------------- */
+/* gradients                                                                 */
+/* -------------------------------------------------------------------------- */
+
+const GRADIENT_SVG = `<svg data-width="72" data-height="89" width="72" height="89">`
+  + `<defs class="clip-path"><linearGradient id="g0" spreadMethod="pad" gradientUnits="userSpaceOnUse" `
+  + `x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#ff0000"/>`
+  + `<stop offset="100%" stop-color="#0000ff"/></linearGradient></defs>`
+  + `<g transform="translate(6,6)"><g>`
+  + `<linearGradient id="p0" gradientTransform="scale(60,30)" href="#g0" xlink:href="#g0"></linearGradient>`
+  + `<path class="typst-shape" d="M 0 0 L 0 30 L 60 30 L 60 0 Z " fill-rule="nonzero" fill="url(#p0)"/>`
+  + `</g></g></svg>`;
+
+test("by default flattens a gradient fill to the coverage-weighted average color", () => {
+  const out = flattenSvg(GRADIENT_SVG);
+  assert.doesNotMatch(out, /Gradient/);
+  assert.doesNotMatch(out, /url\(/);
+  // Halfway between #ff0000 and #0000ff.
+  assert.match(out, /fill="#800080"/);
+});
+
+test("faithful mode re-emits the gradient with the path's baked transform composed in", () => {
+  const out = flattenSvg(GRADIENT_SVG, { flattenGradientsToSolid: false });
+  // href chain resolved: stops inherited from #g0, geometry inherited, the
+  // inline alias' scale(60,30) composed under the ancestor translate(6,6).
+  assert.match(out, /<defs><linearGradient id="pptypst-grad-0"[^>]*gradientUnits="userSpaceOnUse"/);
+  assert.match(out, /gradientTransform="matrix\(60,0,0,30,6,6\)"/);
+  assert.match(out, /<stop offset="0%" stop-color="#ff0000"\/><stop offset="100%" stop-color="#0000ff"\/>/);
+  assert.match(out, /<path d="M 6\.000 6\.000[^"]*" fill="url\(#pptypst-grad-0\)"/);
+});
+
+test("faithful mode folds a transparent gradient stop into stop-opacity", () => {
+  const svg = `<svg data-width="10" data-height="10" width="10" height="10">`
+    + `<linearGradient id="g" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="10" y2="0">`
+    + `<stop offset="0%" stop-color="#ff000080"/><stop offset="100%" stop-color="#0000ff"/></linearGradient>`
+    + `<path d="M0 0 L10 0 L10 10 Z" fill="url(#g)"/></svg>`;
+  const out = flattenSvg(svg, { flattenGradientsToSolid: false });
+  assert.match(out, /<stop offset="0%" stop-color="#ff0000" stop-opacity="0\.502"\/>/);
+});
+
+test("a dangling gradient reference leaves the paint untouched rather than crashing", () => {
+  const svg = `<svg width="4" height="4"><path d="M0 0 L1 1" fill="url(#missing)"/></svg>`;
+  const { gradients, paths } = flattenTypstSvg(svg);
+  assert.equal(gradients.length, 0);
+  assert.equal(paths[0].style.fill, "url(#missing)");
+});
+
 test("flattenSvg forwards the merge option", () => {
   const merged = flattenSvg(
     `<svg width="10" height="10">`

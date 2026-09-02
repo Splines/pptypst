@@ -51,6 +51,104 @@ function num(s: string): number {
   return Number.isFinite(v) ? v : 0;
 }
 
+/* -------------------------------------------------------------------------- */
+/* Color + opacity normalization                                             */
+/*                                                                            */
+/* Ported from the PowerPoint add-in's `web/src/svg.ts`. PowerPoint's SVG      */
+/* import chokes on `#RRGGBBAA` / `rgba(...)` colors; Cavalry's                */
+/* `api.convertSVGToLayers` has the same blind spot, and it also drops         */
+/* `fill-opacity` / `stroke-opacity` that only lived on a group we flatten     */
+/* away. So we split every alpha-carrying color into an opaque color plus an   */
+/* explicit `*-opacity`, and fold group `opacity` / `*-opacity` into the leaf  */
+/* paths the same multiplicative way `combineOpacity` does there.              */
+/* -------------------------------------------------------------------------- */
+
+function toHexByte(value: number): string {
+  const clamped = Math.max(0, Math.min(255, Math.round(value)));
+  return clamped.toString(16).padStart(2, "0");
+}
+
+function clampUnit(value: number): number {
+  if (!Number.isFinite(value)) return 1;
+  return Math.max(0, Math.min(1, value));
+}
+
+/** Parses `"0.5"` / `"50%"` / `"1"` into a 0..1 number; `null` when absent or
+ * unparseable (so callers can treat it as "not specified"). Mirrors
+ * `parseAlpha` in `web/src/svg.ts`. */
+function parseOpacityToken(raw: string | undefined | null): number | null {
+  if (raw == null) return null;
+  const s = raw.trim();
+  if (s === "") return null;
+  const isPercent = s.endsWith("%");
+  const n = Number(isPercent ? s.slice(0, -1) : s);
+  if (!Number.isFinite(n)) return null;
+  return clampUnit(isPercent ? n / 100 : n);
+}
+
+interface ColorAlpha {
+  /** An opaque color string suitable for a `fill` / `stroke` / `stop-color`. */
+  color: string;
+  /** The alpha carried by the input, or `null` if it was already opaque /
+   * not a literal color (`none`, `url(...)`, `currentColor`, a named color,
+   * `#rgb`, `#rrggbb`, `rgb(...)`). */
+  alpha: number | null;
+}
+
+/** Splits `#RGBA` / `#RRGGBBAA` / `rgba(...)` into an opaque color + its
+ * alpha. Anything else is returned untouched with `alpha: null`. This is the
+ * `parseColorWithAlpha` half of `web/src/svg.ts`, minus the DOM color parser
+ * (this module stays runnable on plain Node for the unit tests). */
+function splitColorAlpha(value: string): ColorAlpha {
+  const v = value.trim();
+
+  if (v.startsWith("#")) {
+    const hex = v.slice(1);
+    if (/^[0-9a-fA-F]{8}$/.test(hex)) {
+      return { color: `#${hex.slice(0, 6).toLowerCase()}`, alpha: parseInt(hex.slice(6), 16) / 255 };
+    }
+    if (/^[0-9a-fA-F]{4}$/.test(hex)) {
+      const [r, g, b, a] = hex;
+      return { color: `#${r}${r}${g}${g}${b}${b}`.toLowerCase(), alpha: parseInt(a + a, 16) / 255 };
+    }
+    return { color: v, alpha: null };
+  }
+
+  const rgba = v.toLowerCase().match(
+    /^rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)\s*(?:,\s*([\d.]+%?)\s*)?\)$/,
+  );
+  if (rgba) {
+    const color = `#${toHexByte(Number(rgba[1]))}${toHexByte(Number(rgba[2]))}${toHexByte(Number(rgba[3]))}`;
+    return { color, alpha: rgba[4] ? parseOpacityToken(rgba[4]) : null };
+  }
+
+  return { color: v, alpha: null };
+}
+
+/** `#rrggbb` / `#rgb` -> `[r, g, b]` (0..255). Non-hex inputs fall back to
+ * black -- gradient stops from typst are always `#rrggbb`. */
+function hexToRgb(value: string): [number, number, number] {
+  const hex = value.trim().replace(/^#/, "");
+  if (/^[0-9a-fA-F]{3}$/.test(hex)) {
+    return [parseInt(hex[0] + hex[0], 16), parseInt(hex[1] + hex[1], 16), parseInt(hex[2] + hex[2], 16)];
+  }
+  if (/^[0-9a-fA-F]{6}$/.test(hex)) {
+    return [parseInt(hex.slice(0, 2), 16), parseInt(hex.slice(2, 4), 16), parseInt(hex.slice(4, 6), 16)];
+  }
+  return [0, 0, 0];
+}
+
+/** Formats an opacity for output, trimming a pointless `.0000` tail. */
+function formatOpacity(value: number): string {
+  return Number(clampUnit(value).toFixed(4)).toString();
+}
+
+/** The `#id` a `url(#id)` paint points at, or `null` for any other value. */
+function gradientRefId(paint: string): string | null {
+  const m = paint.trim().match(/^url\(\s*['"]?#([^'")\s]+)['"]?\s*\)$/);
+  return m ? m[1] : null;
+}
+
 /** Indexes into a number array, genuinely typed `number | undefined` (plain
  * indexing is `number` under this project's tsconfig, hiding out-of-range
  * reads -- `Array.prototype.at` needs a newer `lib` than Cavalry's engine is
@@ -308,20 +406,71 @@ interface Style {
   stroke: string;
   strokeWidth: string;
   fillRule: string;
+  /** Effective 0..1 fill opacity: inherited `fill-opacity` x this node's
+   * `fill-opacity` x any alpha carried in the `fill` color x every ancestor's
+   * (and this node's) `opacity`. `1` unless something set transparency. */
+  fillOpacity: number;
+  /** Effective 0..1 stroke opacity, computed the same way as {@link fillOpacity}. */
+  strokeOpacity: number;
+}
+
+/** A `<linearGradient>` / `<radialGradient>` re-emitted into the flat SVG's own
+ * `<defs>`, with the referencing path's baked transform composed in so it still
+ * lines up after flattening. Only present when {@link FlattenOptions.flattenGradientsToSolid}
+ * is `false`. */
+interface ResolvedGradient {
+  id: string;
+  kind: "linear" | "radial";
+  /** Geometry + `spreadMethod` + `gradientUnits`, ready to serialise verbatim. */
+  attrs: Record<string, string>;
+  /** Composed `ancestorMatrix x gradientTransform`, or `null` for none. */
+  transform: Matrix | null;
+  stops: { offset: string; color: string; opacity: number }[];
 }
 
 interface FlattenResult {
   width: number;
   height: number;
   paths: { d: string; style: Style }[];
+  /** Gradients referenced by `fill="url(#...)"` / `stroke="url(#...)"` on the
+   * paths above, already transformed into the flat SVG's coordinate space.
+   * Empty when there are none, or when gradients were flattened to solid fills. */
+  gradients: ResolvedGradient[];
 }
 
 function mergeStyle(base: Style, attrs: Record<string, string | undefined>): Style {
+  const rawFill = attrs.fill;
+  const rawStroke = attrs.stroke;
+  const fillSplit = rawFill != null ? splitColorAlpha(rawFill) : null;
+  const strokeSplit = rawStroke != null ? splitColorAlpha(rawStroke) : null;
+
+  // `opacity` is not an inherited property in SVG -- it composites the element
+  // (and its subtree) as a group. For a flattener that bakes groups into leaf
+  // paths, folding it into both fill and stroke opacity is exact for
+  // non-overlapping shapes (the assumption `mergeByStyle` already leans on) and
+  // a close approximation otherwise. typst only ever emits it on leaf shapes.
+  const nodeOpacity = parseOpacityToken(attrs.opacity) ?? 1;
+
+  // Multiplicative, matching `combineOpacity` in web/src/svg.ts. A node that
+  // re-declares `fill` also re-bases the color alpha; an inherited
+  // `fill-opacity` from an ancestor still rides along (rare in typst output,
+  // and only ever slightly over-darkens a doubly-transparent nesting).
+  const fillOpacity = base.fillOpacity
+    * (parseOpacityToken(attrs["fill-opacity"]) ?? 1)
+    * (fillSplit?.alpha ?? 1)
+    * nodeOpacity;
+  const strokeOpacity = base.strokeOpacity
+    * (parseOpacityToken(attrs["stroke-opacity"]) ?? 1)
+    * (strokeSplit?.alpha ?? 1)
+    * nodeOpacity;
+
   return {
-    fill: attrs.fill ?? base.fill,
-    stroke: attrs.stroke ?? base.stroke,
+    fill: fillSplit ? fillSplit.color : base.fill,
+    stroke: strokeSplit ? strokeSplit.color : base.stroke,
     strokeWidth: attrs["stroke-width"] ?? base.strokeWidth,
     fillRule: attrs["fill-rule"] ?? base.fillRule,
+    fillOpacity: clampUnit(fillOpacity),
+    strokeOpacity: clampUnit(strokeOpacity),
   };
 }
 
@@ -329,29 +478,122 @@ function mergeStyle(base: Style, attrs: Record<string, string | undefined>): Sty
  * Flattens `svgSource` into a list of absolute, already-transformed paths.
  * `SKIP_CONTENT` elements are non-visual or unsupported and their subtree is
  * dropped (foreignObject text-selection overlays, clip paths, styles/scripts).
+ * `linearGradient` / `radialGradient` are skipped here too: they are collected
+ * separately in pass 1 and re-emitted, resolved, by {@link resolveGradients}.
  */
-const SKIP_CONTENT = new Set(["defs", "foreignObject", "style", "script", "clipPath", "symbol", "metadata"]);
+const SKIP_CONTENT = new Set([
+  "defs", "foreignObject", "style", "script", "clipPath", "symbol", "metadata",
+  "linearGradient", "radialGradient",
+]);
 
-export function flattenTypstSvg(svgSource: string): FlattenResult {
+/** A gradient element as parsed straight out of the source (before href
+ * resolution or transform baking). */
+interface RawGradient {
+  kind: "linear" | "radial";
+  attrs: Record<string, string | undefined>;
+  stops: { offset: string; color: string; opacity: number | null }[];
+}
+
+/** A path paint that pointed at a gradient, paired with the transform that got
+ * baked into that path so the gradient can be moved to match. */
+interface GradientRef {
+  /** Index into `paths`. */
+  pathIndex: number;
+  channel: "fill" | "stroke";
+  /** The `#id` from the `url(#id)` paint. */
+  sourceId: string;
+  /** The matrix flattened into this path's `d`. */
+  matrix: Matrix;
+  /** The path's resolved `fill-opacity` / `stroke-opacity`, to fold into the
+   * gradient's stops (Cavalry may not honour `*-opacity` on a `url(...)` paint). */
+  opacity: number;
+  /** Stable id for the re-emitted gradient. */
+  outId: string;
+}
+
+/** Pulls the `<stop>` children out of a gradient element's inner markup,
+ * reading `stop-color` / `stop-opacity` from either attributes or an inline
+ * `style` (typst uses attributes, but hand-authored SVGs vary). */
+function parseStops(inner: string): RawGradient["stops"] {
+  const stopRe = /<stop\b((?:[^"'>]|"[^"]*"|'[^']*')*?)\/?>/g;
+  const stops: RawGradient["stops"] = [];
+  let m = stopRe.exec(inner);
+  while (m !== null) {
+    const a = parseAttrs(m[1]);
+    const styleColor = a.style?.match(/stop-color\s*:\s*([^;]+)/i)?.[1].trim();
+    const styleOpacity = a.style?.match(/stop-opacity\s*:\s*([^;]+)/i)?.[1].trim();
+    stops.push({
+      offset: a.offset ?? "0",
+      color: (a["stop-color"] ?? styleColor ?? "#000000").trim(),
+      opacity: parseOpacityToken(a["stop-opacity"] ?? styleOpacity),
+    });
+    m = stopRe.exec(inner);
+  }
+  return stops;
+}
+
+export interface FlattenOptions {
+  /**
+   * When the flattened SVG has more than this many visible paths, paths that
+   * share an identical resolved style are merged into a single `<path>` (one
+   * Cavalry layer), kept in first-seen order. Cuts `api.convertSVGToLayers`
+   * time on large figures, at the cost of per-shape editability. Omit (or
+   * `Infinity`) to never merge -- the default.
+   */
+  mergePathsAbove?: number;
+  /**
+   * How `fill="url(#...)"` / `stroke="url(#...)"` gradient paints are handled:
+   *
+   *   - `true` (default) -- replace the paint with a single flat color, the
+   *     coverage-weighted average of the gradient's stops (its alpha folded into
+   *     `fill-opacity` / `stroke-opacity`). Lossy, but every importer renders
+   *     it; mirrors the PowerPoint add-in giving up on true gradients.
+   *   - `false` -- keep the gradient: re-emit it in the flat SVG's own `<defs>`
+   *     with the referencing path's baked transform composed in, and alpha
+   *     folded into `stop-opacity`. Faithful, but only as good as the importer's
+   *     gradient support.
+   */
+  flattenGradientsToSolid?: boolean;
+}
+
+export function flattenTypstSvg(svgSource: string, options: FlattenOptions = {}): FlattenResult {
   const glyphs = new Map<string, string>();
+  const rawGradients = new Map<string, RawGradient>();
   const paths: { d: string; style: Style }[] = [];
+  const gradientRefs: GradientRef[] = [];
   let width = 0;
   let height = 0;
 
-  // Pass 1: collect every `<path id="...">` inside `<defs>` (glyph outlines).
+  // Pass 1: collect `<path id="...">` glyph outlines and every gradient
+  // definition, wherever they sit (typst puts the base gradient in
+  // `<defs class="clip-path">` and an href'd, transformed alias inline next to
+  // the shape -- and pass 2 skips both).
   {
     let pos = 0;
     for (;;) {
       const { tag, closeName, end } = nextTag(svgSource, pos);
       if (!tag && !closeName) break;
       pos = end;
-      if (tag?.name === "path" && tag.attrs.id) {
+      if (!tag) continue;
+      if (tag.name === "path" && tag.attrs.id) {
         glyphs.set(tag.attrs.id, tag.attrs.d ?? "");
+      } else if ((tag.name === "linearGradient" || tag.name === "radialGradient") && tag.attrs.id) {
+        const inner = tag.selfClosing
+          ? ""
+          : svgSource.slice(tag.contentStart).match(/^([\s\S]*?)<\/(?:linear|radial)Gradient>/)?.[1] ?? "";
+        rawGradients.set(tag.attrs.id, {
+          kind: tag.name === "linearGradient" ? "linear" : "radial",
+          attrs: tag.attrs,
+          stops: parseStops(inner),
+        });
       }
     }
   }
 
-  const rootStyle: Style = { fill: "none", stroke: "none", strokeWidth: "1", fillRule: "nonzero" };
+  const rootStyle: Style = {
+    fill: "none", stroke: "none", strokeWidth: "1", fillRule: "nonzero",
+    fillOpacity: 1, strokeOpacity: 1,
+  };
 
   function walk(pos: number, matrix: Matrix, style: Style): number {
     for (;;) {
@@ -384,7 +626,10 @@ export function flattenTypstSvg(svgSource: string): FlattenResult {
           const ox = Number(tag.attrs.x ?? 0);
           const oy = Number(tag.attrs.y ?? 0);
           const useMatrix = (ox || oy) ? multiply(childMatrix, { ...IDENTITY, e: ox, f: oy }) : childMatrix;
+          const pathIndex = paths.length;
           paths.push({ d: transformPathData(d, useMatrix), style: childStyle });
+          registerGradientRef(pathIndex, "fill", childStyle.fill, useMatrix, childStyle.fillOpacity);
+          registerGradientRef(pathIndex, "stroke", childStyle.stroke, useMatrix, childStyle.strokeOpacity);
         }
         if (!tag.selfClosing) pos = skipToClose(svgSource, tag.name, tag.contentStart);
         continue;
@@ -395,26 +640,176 @@ export function flattenTypstSvg(svgSource: string): FlattenResult {
     }
   }
 
+  function registerGradientRef(
+    pathIndex: number, channel: "fill" | "stroke", paint: string, matrix: Matrix, opacity: number,
+  ): void {
+    const sourceId = gradientRefId(paint);
+    if (sourceId === null || !rawGradients.has(sourceId)) return;
+    gradientRefs.push({
+      pathIndex, channel, sourceId, matrix, opacity,
+      outId: `pptypst-grad-${String(gradientRefs.length)}`,
+    });
+  }
+
   walk(0, IDENTITY, rootStyle);
-  return { width, height, paths };
+
+  const gradients = resolveGradients(paths, gradientRefs, rawGradients, options.flattenGradientsToSolid !== false);
+  return { width, height, paths, gradients };
 }
 
-export interface FlattenOptions {
-  /**
-   * When the flattened SVG has more than this many visible paths, paths that
-   * share an identical resolved style are merged into a single `<path>` (one
-   * Cavalry layer), kept in first-seen order. Cuts `api.convertSVGToLayers`
-   * time on large figures, at the cost of per-shape editability. Omit (or
-   * `Infinity`) to never merge -- the default.
-   */
-  mergePathsAbove?: number;
+/** Follows a gradient's `href` / `xlink:href` chain, inheriting any attribute
+ * (and the stops) not set closer to the leaf -- SVG's "if absent" inheritance,
+ * not a compose. */
+function resolveGradientChain(
+  startId: string, defs: Map<string, RawGradient>,
+): { kind: "linear" | "radial"; attrs: Record<string, string | undefined>; stops: RawGradient["stops"] } | null {
+  const start = defs.get(startId);
+  if (!start) return null;
+
+  const merged: Record<string, string | undefined> = {};
+  const inherited = new Set<string>();
+  let stops: RawGradient["stops"] = [];
+  const seen = new Set<string>();
+  let cur: RawGradient | undefined = start;
+  let curId: string | undefined = startId;
+
+  while (cur && curId !== undefined && !seen.has(curId)) {
+    seen.add(curId);
+    for (const [k, v] of Object.entries(cur.attrs)) {
+      if (v !== undefined && k !== "id" && k !== "href" && k !== "xlink:href" && !inherited.has(k)) {
+        merged[k] = v;
+        inherited.add(k);
+      }
+    }
+    if (stops.length === 0 && cur.stops.length > 0) stops = cur.stops;
+    const parentRef: string | undefined = cur.attrs.href ?? cur.attrs["xlink:href"];
+    curId = parentRef !== undefined && parentRef.startsWith("#") ? parentRef.slice(1) : undefined;
+    cur = curId !== undefined ? defs.get(curId) : undefined;
+  }
+
+  return { kind: start.kind, attrs: merged, stops };
+}
+
+/** Resolves a chain's raw stops into opaque `#rrggbb` colors plus a single
+ * 0..1 `opacity` -- folding in each stop's own alpha (from an `#rrggbbaa`
+ * `stop-color` or a `stop-opacity`) and `extra` (the referencing path's
+ * fill/stroke opacity). Mirrors the `stop-color` -> `stop-opacity` split in
+ * `web/src/svg.ts`. */
+function normalizeStops(
+  stops: readonly RawGradient["stops"][number][], extra: number,
+): { offset: string; color: string; opacity: number }[] {
+  return stops.map((s) => {
+    const { color, alpha } = splitColorAlpha(s.color);
+    return { offset: s.offset, color, opacity: clampUnit((s.opacity ?? 1) * (alpha ?? 1) * extra) };
+  });
+}
+
+/** Coverage-weighted average of a gradient's stops: each stop weighted by half
+ * the offset gap to each neighbour, so it does not matter how densely typst
+ * samples the ramp. */
+function averageStops(stops: readonly { offset: string; color: string; opacity: number }[]): {
+  color: string; opacity: number;
+} {
+  const parsed = stops
+    .map(s => ({
+      off: clampUnit(s.offset.endsWith("%") ? Number(s.offset.slice(0, -1)) / 100 : Number(s.offset)),
+      rgb: hexToRgb(s.color),
+      a: s.opacity,
+    }))
+    .sort((x, y) => x.off - y.off);
+
+  if (parsed.length === 0) return { color: "#000000", opacity: 1 };
+  if (parsed.length === 1) {
+    const [r, g, b] = parsed[0].rgb;
+    return { color: `#${toHexByte(r)}${toHexByte(g)}${toHexByte(b)}`, opacity: clampUnit(parsed[0].a) };
+  }
+
+  let r = 0, g = 0, b = 0, a = 0, wSum = 0;
+  for (let i = 0; i < parsed.length; i++) {
+    const lo = parsed[Math.max(0, i - 1)].off;
+    const hi = parsed[Math.min(parsed.length - 1, i + 1)].off;
+    const w = Math.max((hi - lo) / 2, 1e-6);
+    r += parsed[i].rgb[0] * w;
+    g += parsed[i].rgb[1] * w;
+    b += parsed[i].rgb[2] * w;
+    a += parsed[i].a * w;
+    wSum += w;
+  }
+  return { color: `#${toHexByte(r / wSum)}${toHexByte(g / wSum)}${toHexByte(b / wSum)}`, opacity: clampUnit(a / wSum) };
+}
+
+/** Geometry attributes worth carrying onto a re-emitted gradient. */
+const LINEAR_GEOM = ["x1", "y1", "x2", "y2"];
+const RADIAL_GEOM = ["cx", "cy", "r", "fx", "fy", "fr"];
+
+/**
+ * Turns each {@link GradientRef} into either a flat color written straight
+ * back onto its path (`toSolid`), or a {@link ResolvedGradient} to emit in the
+ * flat SVG's `<defs>`. In the gradient case the referencing path's baked matrix
+ * is composed into `gradientTransform` so it still lines up, and every alpha
+ * (stop alpha, stop-opacity, the path's own fill/stroke-opacity) is folded into
+ * `stop-opacity`.
+ */
+function resolveGradients(
+  paths: { d: string; style: Style }[],
+  refs: readonly GradientRef[],
+  defs: Map<string, RawGradient>,
+  toSolid: boolean,
+): ResolvedGradient[] {
+  const out: ResolvedGradient[] = [];
+  const opacityChannel = (c: "fill" | "stroke"): "fillOpacity" | "strokeOpacity" =>
+    c === "fill" ? "fillOpacity" : "strokeOpacity";
+
+  for (const ref of refs) {
+    const chain = resolveGradientChain(ref.sourceId, defs);
+    if (!chain || chain.stops.length === 0) continue;
+    const path = paths[ref.pathIndex];
+
+    if (toSolid) {
+      const avg = averageStops(normalizeStops(chain.stops, 1));
+      path.style[ref.channel] = avg.color;
+      path.style[opacityChannel(ref.channel)] = clampUnit(
+        path.style[opacityChannel(ref.channel)] * avg.opacity,
+      );
+      continue;
+    }
+
+    const units = chain.attrs.gradientUnits ?? "objectBoundingBox";
+    const ownTransform = chain.attrs.gradientTransform ? parseTransform(chain.attrs.gradientTransform) : null;
+    // Only `userSpaceOnUse` gradients can be re-anchored without the path's
+    // pre-flatten bounding box; typst always emits that, so the other branch is
+    // just a safety net that leaves the gradient in its original local space.
+    const transform = units === "userSpaceOnUse"
+      ? multiply(ref.matrix, ownTransform ?? IDENTITY)
+      : ownTransform;
+
+    const attrs: Record<string, string> = { gradientUnits: "userSpaceOnUse" };
+    const spread = chain.attrs.spreadMethod;
+    if (spread !== undefined) attrs.spreadMethod = spread;
+    for (const k of chain.kind === "linear" ? LINEAR_GEOM : RADIAL_GEOM) {
+      const v = chain.attrs[k];
+      if (v !== undefined) attrs[k] = v;
+    }
+
+    out.push({
+      id: ref.outId,
+      kind: chain.kind,
+      attrs,
+      transform,
+      stops: normalizeStops(chain.stops, ref.opacity),
+    });
+    path.style[ref.channel] = `url(#${ref.outId})`;
+    // The alpha now lives on the stops; don't double-apply it on the path.
+    path.style[opacityChannel(ref.channel)] = 1;
+  }
+  return out;
 }
 
 type FlatPath = { d: string; style: Style };
 
 /** Distinguishes two resolved styles for merge purposes (see {@link mergeByStyle}). */
 function styleKey(s: Style): string {
-  return `${s.fill} ${s.stroke} ${s.strokeWidth} ${s.fillRule}`;
+  return `${s.fill} ${s.stroke} ${s.strokeWidth} ${s.fillRule} ${formatOpacity(s.fillOpacity)} ${formatOpacity(s.strokeOpacity)}`;
 }
 
 /**
@@ -454,6 +849,23 @@ export function countVisiblePaths(result: FlattenResult): number {
   return n;
 }
 
+function matrixToString(m: Matrix): string {
+  return `matrix(${[m.a, m.b, m.c, m.d, m.e, m.f].map(n => Number(n.toFixed(6)).toString()).join(",")})`;
+}
+
+/** Serializes one {@link ResolvedGradient} back to markup for the flat `<defs>`. */
+function serializeGradient(g: ResolvedGradient): string {
+  const tag = g.kind === "linear" ? "linearGradient" : "radialGradient";
+  const attrs = [`id="${g.id}"`];
+  for (const [k, v] of Object.entries(g.attrs)) attrs.push(`${k}="${v}"`);
+  if (g.transform) attrs.push(`gradientTransform="${matrixToString(g.transform)}"`);
+  const stops = g.stops
+    .map(s => `<stop offset="${s.offset}" stop-color="${s.color}"`
+      + `${s.opacity < 1 ? ` stop-opacity="${formatOpacity(s.opacity)}"` : ""}/>`)
+    .join("");
+  return `<${tag} ${attrs.join(" ")}>${stops}</${tag}>`;
+}
+
 /** Serializes a {@link FlattenResult} into a plain, flat SVG document. */
 export function serializeFlatSvg(result: FlattenResult, options: FlattenOptions = {}): string {
   const visible = result.paths.filter(p => p.d.trim() !== "");
@@ -461,20 +873,28 @@ export function serializeFlatSvg(result: FlattenResult, options: FlattenOptions 
     ? mergeByStyle(visible)
     : visible;
 
+  const defs = result.gradients.length > 0
+    ? `<defs>${result.gradients.map(serializeGradient).join("")}</defs>\n`
+    : "";
+
   const body = emitted
     .map((p) => {
       const fill = p.style.fill === "none" ? "none" : p.style.fill || "#000000";
       const stroke = p.style.stroke === "none" ? "none" : p.style.stroke || "none";
-      return `<path d="${p.d}" fill="${fill}" fill-rule="${p.style.fillRule}" `
-        + `stroke="${stroke}" stroke-width="${p.style.strokeWidth}"/>`;
+      const fillOpacity = p.style.fillOpacity < 1 ? ` fill-opacity="${formatOpacity(p.style.fillOpacity)}"` : "";
+      const strokeOpacity = p.style.strokeOpacity < 1 && stroke !== "none"
+        ? ` stroke-opacity="${formatOpacity(p.style.strokeOpacity)}"`
+        : "";
+      return `<path d="${p.d}" fill="${fill}"${fillOpacity} fill-rule="${p.style.fillRule}" `
+        + `stroke="${stroke}"${strokeOpacity} stroke-width="${p.style.strokeWidth}"/>`;
     })
     .join("\n");
 
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${String(result.width)} ${String(result.height)}" `
-    + `width="${String(result.width)}" height="${String(result.height)}">\n${body}\n</svg>`;
+    + `width="${String(result.width)}" height="${String(result.height)}">\n${defs}${body}\n</svg>`;
 }
 
 /** Convenience: flatten typst.ts's SVG output into an importer-friendly SVG string. */
 export function flattenSvg(svgSource: string, options: FlattenOptions = {}): string {
-  return serializeFlatSvg(flattenTypstSvg(svgSource), options);
+  return serializeFlatSvg(flattenTypstSvg(svgSource, options), options);
 }

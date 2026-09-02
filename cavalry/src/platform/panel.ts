@@ -48,7 +48,7 @@ export interface PanelHandlers {
   /**
    * The "Update font size" button (shown while several formulas are selected)
    * was clicked. The app re-renders every selected formula with its own source,
-   * colour and math mode but the size from {@link Panel.getBulkFontSizePt}.
+   * color and math mode but the size from {@link Panel.getBulkFontSizePt}.
    */
   onBulkUpdate: () => void;
   /**
