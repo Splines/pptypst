@@ -15,8 +15,9 @@
  * `ui.scriptLocation` (the Scripts folder); the `_assets` suffix keeps
  * `pptypst_assets` out of the Scripts menu.
  *
- * Needs the `zip` command on PATH. Run with: npm run pack
- * (or `npm run setup` for assets + build + pack).
+ * Needs the `zip` command on PATH. Run with: npm run pack (expects a prior
+ * `npm run build`); `npm run bundle` does build + pack, `npm run setup` does
+ * assets + build + pack.
  */
 
 import { cp, mkdir, readdir, rm, stat } from "node:fs/promises";
@@ -50,7 +51,11 @@ function human(bytes: number): string {
 
 const bundle = join(dist, "pptypst-cavalry.js");
 if (!(await exists(bundle))) {
-  throw new Error("Missing dist/pptypst-cavalry.js -- run `npm run build` first.");
+  throw new Error(
+    "Missing dist/pptypst-cavalry.js -- run `npm run build` first, or `npm run "
+    + "bundle` to build then pack in one step (chain with `&&`, not `&`, so they "
+    + "run in order).",
+  );
 }
 const vendor = join(root, "assets", "vendor");
 if (!(await exists(vendor))) {

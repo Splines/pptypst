@@ -8,6 +8,7 @@
     "assets": "node scripts/fetch-assets.ts",
     "build": "vite build",
     "pack": "node scripts/pack.ts",
+    "bundle": "npm run build && npm run pack",
     "test": "node --test",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json && tsc --noEmit -p tsconfig.scripts.json",
     "lint": "eslint --config .config/eslint.mjs src test scripts vite.config.ts",
